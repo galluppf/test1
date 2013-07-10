@@ -1,0 +1,98 @@
+LIB_DIR = ../../spin1_api/src
+INC_DIR = ../../spin1_api/src
+
+CFLAGS=-DDEBUG
+
+CC := arm-none-linux-gnueabi-gcc -c -O1 -nostdlib -mthumb-interwork -march=armv5te -std=gnu99 -I ../inc -I $(INC_DIR) $(CFLAGS)
+LD := arm-none-linux-gnueabi-ld
+OC := arm-none-linux-gnueabi-objcopy
+OD := arm-none-linux-gnueabi-objdump
+RM := /bin/rm -rf
+CAT := /bin/cat
+CP := cp
+MV := mv
+
+
+APP_OBJECTS = config.o comms.o dma.o main.o recording.o lfsr.o
+
+
+spike_source: $(APP_OBJECTS) model_spike_source.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) model_spike_source.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_spike_source.elf
+	$(OC) -O binary -j APLX    app_frame_spike_source.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_spike_source.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_spike_source.elf RW_DATA.bin
+	$(OD) -dt app_frame_spike_source.elf > app_frame_spike_source.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_spike_source.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_spike_source.aplx ../../../binaries
+	${MV} app_frame_spike_source.aplx app_frame_spike_source.elf ../bin
+
+spike_source_array: $(APP_OBJECTS) model_spike_source_array.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) model_spike_source_array.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_spike_source_array.elf
+	$(OC) -O binary -j APLX    app_frame_spike_source_array.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_spike_source_array.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_spike_source_array.elf RW_DATA.bin
+	$(OD) -dt app_frame_spike_source_array.elf > app_frame_spike_source_array.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_spike_source_array.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_spike_source_array.aplx ../../../binaries
+	${MV} app_frame_spike_source_array.aplx app_frame_spike_source_array.elf ../bin
+
+spike_source_poisson: $(APP_OBJECTS) model_spike_source_poisson.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) model_spike_source_poisson.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_spike_source_poisson.elf
+	$(OC) -O binary -j APLX    app_frame_spike_source_poisson.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_spike_source_poisson.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_spike_source_poisson.elf RW_DATA.bin
+	$(OD) -dt app_frame_spike_source_poisson.elf > app_frame_spike_source_poisson.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_spike_source_poisson.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_spike_source_poisson.aplx ../../../binaries
+	${MV} app_frame_spike_source_poisson.aplx app_frame_spike_source_poisson.elf ../bin
+
+
+comms.o: ../src/comms.c ../inc/comms.h ../inc/dma.h
+	$(CC) ../src/comms.c
+
+
+config.o: ../src/config.c ../inc/config.h ../inc/dma.h ../inc/model_general.h
+	$(CC) ../src/config.c
+
+
+dma.o: ../src/dma.c ../inc/comms.h ../inc/dma.h ../inc/model_general.h
+	$(CC) ../src/dma.c
+
+
+lfsr.o: ../src/lfsr.c ../inc/lfsr.h
+	$(CC) ../src/lfsr.c
+
+
+main.o: ../src/main.c  ../inc/comms.h ../inc/config.h  ../inc/dma.h ../inc/model_general.h
+	$(CC) ../src/main.c
+
+
+model_spike_source.o: ../src/model_spike_source.c
+	$(CC) ../src/model_spike_source.c
+
+
+model_spike_source_array.o: ../src/model_spike_source_array.c
+	$(CC) ../src/model_spike_source_array.c
+
+
+model_spike_source_poisson.o: ../src/model_spike_source_poisson.c
+	$(CC) ../src/model_spike_source_poisson.c
+
+
+model_dummy.o: ../src/model_dummy.c
+	$(CC) ../src/model_dummy.c
+
+
+recording.o: ../src/recording.c ../inc/recording.h
+	$(CC) ../src/recording.c
+
+
+clean:
+	$(RM) *.o  *.txt ../bin/* *~
+	$(RM) ../doc/*.html ../doc/*.css ../doc/bin ../doc/build ../doc/inc ../doc/src

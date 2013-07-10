@@ -1,0 +1,944 @@
+@
+@ Auto-generated from "./spinnaker.h" - Tue Jul  9 11:40:45 2013
+@
+@------------------------------------------------------------------------------
+@
+@ spinnaker.h	    General purpose definitions for Spinnaker/SCAMP
+@
+@ Copyright (C)    The University of Manchester - 2009, 2010, 2011
+@
+@ Author           Steve Temple, APT Group, School of Computer Science
+@ Email            temples@cs.man.ac.uk
+@
+@ !! NB - this is a work in progress - do not treat as definitive !!
+@
+@------------------------------------------------------------------------------
+
+@ Change log
+
+@ 09nov11 - tidy LED definitions - only LED_0 defined
+@ 08nov11 - added upper 8 router diagnostic regs
+@ 05nov11 - add hardware version stuff sv->hw_ver, GPIO_HW_VER, SRF_HW_VER
+@ 01nov11 - add #define CMD_AS
+@ 15sep11 - change "msg" pointers from msg_t* to void* (bodge for sdp_msg_t)
+
+@------------------------------------------------------------------------------
+
+@ Numbers of CPUS, links
+
+                .ifdef  TEST_CHIP
+                .equ    NUM_CPUS, 2
+                .else       
+                .equ    NUM_CPUS, 18
+                .endif      
+
+                .equ    MAX_CPU, (NUM_CPUS - 1)
+
+                .equ    NUM_LINKS, 6
+                .equ    MAX_LINK, (NUM_LINKS - 1)
+
+@------------------------------------------------------------------------------
+
+@ Memory definitions
+
+                .equ    ITCM_BASE, 0x00000000
+                .equ    ITCM_SIZE, 0x00008000
+                .equ    ITCM_TOP, (ITCM_BASE + ITCM_SIZE)
+
+                .equ    ITCM_TOP_64, (ITCM_TOP - 64)
+                .equ    ITCM_TOP_512, (ITCM_TOP - 512)
+
+                .equ    DTCM_BASE, 0x00400000
+                .equ    DTCM_SIZE, 0x00010000
+                .equ    DTCM_TOP, (DTCM_BASE + DTCM_SIZE)
+
+                .equ    SDRAM_BASE, 0x70000000
+                .equ    SDRAM_SIZE, (128 * 1024 * 1024)
+                .equ    SDRAM_TOP, (SDRAM_BASE + SDRAM_SIZE)
+
+                .equ    SYSRAM_BASE, 0xf5000000
+
+                .ifdef  TEST_CHIP
+                .equ    SYSRAM_SIZE, 0x00004000
+                .else       
+                .equ    SYSRAM_SIZE, 0x00008000
+                .endif      
+
+                .equ    SYSRAM_TOP, (SYSRAM_BASE + SYSRAM_SIZE)
+
+                .equ    ROM_BASE, 0xf6000000
+                .equ    ROM_SIZE, 0x00008000
+                .equ    ROM_TOP, (ROM_BASE + ROM_SIZE)
+
+@------------------------------------------------------------------------------
+
+@ Comms controller definitions
+
+                .equ    CC_BASE, 0x10000000              @ Unbuffered
+
+                .ifdef  TEST_CHIP
+                .equ    CC_TCR, 0x00
+                .equ    CC_RSR, 0x04
+                .equ    CC_TXDATA, 0x08
+                .equ    CC_TXKEY, 0x0c
+                .equ    CC_RXDATA, 0x10
+                .equ    CC_RXKEY, 0x14
+                .equ    CC_TEST, 0x1c
+                .else       
+                .equ    CC_TCR, 0x00
+                .equ    CC_TXDATA, 0x04
+                .equ    CC_TXKEY, 0x08
+                .equ    CC_RSR, 0x0c
+                .equ    CC_RXDATA, 0x10
+                .equ    CC_RXKEY, 0x14
+                .equ    CC_SAR, 0x18
+                .equ    CC_TEST, 0x1c
+                .endif      
+
+@------------------------------------------------------------------------------
+
+@ Timer definitions
+
+                .equ    TIMER_BASE, 0x11000000              @ Unbuffered
+
+                .equ    T1_LOAD, 0x00
+                .equ    T1_COUNT, 0x04
+                .equ    T1_CONTROL, 0x08
+                .equ    T1_INT_CLR, 0x0c
+                .equ    T1_RAW_INT, 0x10
+                .equ    T1_MASK_INT, 0x14
+                .equ    T1_BG_LOAD, 0x18
+
+                .equ    T2_LOAD, 0x20
+                .equ    T2_COUNT, 0x24
+                .equ    T2_CONTROL, 0x28
+                .equ    T2_INT_CLR, 0x2c
+                .equ    T2_RAW_INT, 0x30
+                .equ    T2_MASK_INT, 0x34
+                .equ    T2_BG_LOAD, 0x38
+
+@------------------------------------------------------------------------------
+
+@ VIC definitions
+
+                .equ    VIC_BASE, 0x1f000000              @ Unbuffered
+
+                .equ    VIC_IRQST, 0x00
+                .equ    VIC_FIQST, 0x04
+                .equ    VIC_RAW, 0x08
+                .equ    VIC_SELECT, 0x0c
+                .equ    VIC_ENABLE, 0x10
+                .equ    VIC_DISABLE, 0x14
+                .equ    VIC_SOFT_SET, 0x18
+                .equ    VIC_SOFT_CLR, 0x1c
+                .equ    VIC_PROTECT, 0x20
+                .equ    VIC_VADDR, 0x30
+                .equ    VIC_DEFADDR, 0x34
+
+                .equ    VIC_ADDR0, 0x100
+                .equ    VIC_ADDR1, 0x104
+                .equ    VIC_ADDR2, 0x108
+                .equ    VIC_ADDR3, 0x10c
+                .equ    VIC_ADDR4, 0x110
+                .equ    VIC_ADDR5, 0x114
+                .equ    VIC_ADDR6, 0x118
+                .equ    VIC_ADDR7, 0x11c
+                .equ    VIC_ADDR8, 0x120
+                .equ    VIC_ADDR9, 0x124
+                .equ    VIC_ADDR10, 0x128
+                .equ    VIC_ADDR11, 0x12c
+                .equ    VIC_ADDR12, 0x130
+                .equ    VIC_ADDR13, 0x134
+                .equ    VIC_ADDR14, 0x138
+                .equ    VIC_ADDR15, 0x13c
+
+                .equ    VIC_CNTL0, 0x200
+                .equ    VIC_CNTL1, 0x204
+                .equ    VIC_CNTL2, 0x208
+                .equ    VIC_CNTL3, 0x20c
+                .equ    VIC_CNTL4, 0x210
+                .equ    VIC_CNTL5, 0x214
+                .equ    VIC_CNTL6, 0x218
+                .equ    VIC_CNTL7, 0x21c
+                .equ    VIC_CNTL8, 0x220
+                .equ    VIC_CNTL9, 0x224
+                .equ    VIC_CNTL10, 0x228
+                .equ    VIC_CNTL11, 0x22c
+                .equ    VIC_CNTL12, 0x230
+                .equ    VIC_CNTL13, 0x234
+                .equ    VIC_CNTL14, 0x238
+                .equ    VIC_CNTL15, 0x23c
+
+                .equ    WDOG_INT, 0
+                .equ    SOFTWARE_INT, 1
+                .equ    COMM_RX_INT, 2
+                .equ    COMM_TX_INT, 3
+                .equ    TIMER1_INT, 4
+                .equ    TIMER2_INT, 5
+                .equ    CC_RDY_INT, 6
+                .equ    CC_RPE_INT, 7
+                .equ    CC_RFE_INT, 8
+                .equ    CC_TFL_INT, 9
+                .equ    CC_TOV_INT, 10
+                .equ    CC_TMT_INT, 11
+                .equ    DMA_DONE_INT, 12
+                .equ    DMA_ERR_INT, 13
+                .equ    DMA_TO_INT, 14
+                .equ    RTR_DIAG_INT, 15
+                .equ    RTR_DUMP_INT, 16
+                .equ    RTR_ERR_INT, 17
+                .equ    CPU_INT, 18
+                .equ    ETH_TX_INT, 19
+                .equ    ETH_RX_INT, 20
+                .equ    ETH_PHY_INT, 21
+                .equ    SLOW_CLK_INT, 22
+
+                .ifdef  TEST_CHIP
+                .else       
+                .equ    CC_TNF_INT, 23
+                .equ    CC_MC_INT, 24
+                .equ    CC_P2P_INT, 25
+                .equ    CC_NN_INT, 26
+                .equ    CC_FR_INT, 27
+                .equ    EXT0_INT, 28
+                .equ    EXT1_INT, 29
+                .equ    EXT2_INT, 30
+                .equ    EXT3_INT, 31
+                .endif      
+
+@------------------------------------------------------------------------------
+
+@ DMA controller definitions
+
+                .equ    DMA_BASE, 0x30000000              @ Unbuffered
+
+                .ifdef  TEST_CHIP
+                .equ    DMA_CRC, 0x00
+                .equ    DMA_CRC2, 0x100
+                .else       
+                .equ    DMA_CRCT, 0x180
+                .endif      
+
+                .equ    DMA_ADRS, 0x04
+                .equ    DMA_ADRT, 0x08
+                .equ    DMA_DESC, 0x0c
+                .equ    DMA_CTRL, 0x10
+                .equ    DMA_STAT, 0x14
+                .equ    DMA_GCTL, 0x18
+                .equ    DMA_CRCC, 0x1c
+                .equ    DMA_CRCR, 0x20
+                .equ    DMA_TMTV, 0x24
+                .equ    DMA_SCTL, 0x28
+
+                .equ    DMA_STAT0, 0x40
+                .equ    DMA_STAT1, 0x44
+                .equ    DMA_STAT2, 0x48
+                .equ    DMA_STAT3, 0x4c
+                .equ    DMA_STAT4, 0x50
+                .equ    DMA_STAT5, 0x54
+                .equ    DMA_STAT6, 0x58
+                .equ    DMA_STAT7, 0x5c
+
+                .equ    DMA_AD2S, 0x104
+                .equ    DMA_AD2T, 0x108
+                .equ    DMA_DES2, 0x10c
+
+@------------------------------------------------------------------------------
+
+@ PL340 definitions
+
+                .equ    PL340_BASE, 0xf0000000
+
+                .equ    MC_STAT, 0x00
+                .equ    MC_CMD, 0x04
+                .equ    MC_DIRC, 0x08
+                .equ    MC_MCFG, 0x0c
+
+                .equ    MC_REFP, 0x10
+                .equ    MC_CASL, 0x14
+                .equ    MC_DQSS, 0x18
+                .equ    MC_MRD, 0x1c
+                .equ    MC_RAS, 0x20
+                .equ    MC_RC, 0x24
+                .equ    MC_RCD, 0x28
+                .equ    MC_RFC, 0x2c
+                .equ    MC_RP, 0x30
+                .equ    MC_RRD, 0x34
+                .equ    MC_WR, 0x38
+                .equ    MC_WTR, 0x3c
+                .equ    MC_XP, 0x40
+                .equ    MC_XSR, 0x44
+                .equ    MC_ESR, 0x48
+
+                .equ    MC_MCFG2, 0x4c
+                .equ    MC_MCFG3, 0x50
+
+                .equ    MC_QOS0, 0x100
+                .equ    MC_QOS1, 0x104
+                .equ    MC_QOS2, 0x108
+                .equ    MC_QOS3, 0x10c
+                .equ    MC_QOS4, 0x110
+                .equ    MC_QOS5, 0x114
+                .equ    MC_QOS6, 0x118
+                .equ    MC_QOS7, 0x11c
+                .equ    MC_QOS8, 0x120
+                .equ    MC_QOS9, 0x124
+                .equ    MC_QOS10, 0x128
+                .equ    MC_QOS11, 0x12c
+                .equ    MC_QOS12, 0x130
+                .equ    MC_QOS13, 0x134
+                .equ    MC_QOS14, 0x138
+                .equ    MC_QOS15, 0x13c
+
+                .equ    MC_CCFG0, 0x200
+                .equ    MC_CCFG1, 0x204
+                .equ    MC_CCFG2, 0x208
+                .equ    MC_CCFG3, 0x20c
+
+                .equ    DLL_STATUS, 0x300
+                .equ    DLL_CONFIG0, 0x304
+                .equ    DLL_CONFIG1, 0x308
+
+@------------------------------------------------------------------------------
+
+@ Router definitions
+
+                .equ    RTR_BASE, 0xf1000000
+
+                .equ    RTR_CONTROL, 0x00
+                .equ    RTR_STATUS, 0x04
+
+                .equ    RTR_EHDR, 0x08
+                .equ    RTR_EKEY, 0x0c
+                .equ    RTR_EDAT, 0x10
+                .equ    RTR_ESTAT, 0x14
+                .equ    RTR_DHDR, 0x18
+                .equ    RTR_DKEY, 0x1c
+                .equ    RTR_DDAT, 0x20
+                .equ    RTR_DLINK, 0x24
+                .equ    RTR_DSTAT, 0x28
+                .equ    RTR_DGEN, 0x2c
+
+                .equ    RTR_DGF0, 0x200
+                .equ    RTR_DGF1, 0x204
+                .equ    RTR_DGF2, 0x208
+                .equ    RTR_DGF3, 0x20c
+                .equ    RTR_DGF4, 0x210
+                .equ    RTR_DGF5, 0x214
+                .equ    RTR_DGF6, 0x218
+                .equ    RTR_DGF7, 0x21c
+
+                .equ    RTR_DGC0, 0x300
+                .equ    RTR_DGC1, 0x304
+                .equ    RTR_DGC2, 0x308
+                .equ    RTR_DGC3, 0x30c
+                .equ    RTR_DGC4, 0x310
+                .equ    RTR_DGC5, 0x314
+                .equ    RTR_DGC6, 0x318
+                .equ    RTR_DGC7, 0x31c
+
+                .ifdef  TEST_CHIP
+                .else       
+                .equ    RTR_DGF8, 0x220
+                .equ    RTR_DGF9, 0x224
+                .equ    RTR_DGF10, 0x228
+                .equ    RTR_DGF11, 0x22c
+                .equ    RTR_DGF12, 0x230
+                .equ    RTR_DGF13, 0x234
+                .equ    RTR_DGF14, 0x238
+                .equ    RTR_DGF15, 0x23c
+
+                .equ    RTR_DGC8, 0x320
+                .equ    RTR_DGC9, 0x324
+                .equ    RTR_DGC10, 0x328
+                .equ    RTR_DGC11, 0x32c
+                .equ    RTR_DGC12, 0x330
+                .equ    RTR_DGC13, 0x334
+                .equ    RTR_DGC14, 0x338
+                .equ    RTR_DGC15, 0x33c
+                .endif      
+
+                .equ    RTR_TST1, 0xf00
+                .equ    RTR_TST2, 0xf04
+
+                .ifdef  TEST_CHIP
+                .equ    P2P_TABLE_SIZE, 256
+                .equ    MC_TABLE_SIZE, 256
+                .else       
+                .equ    P2P_TABLE_SIZE, 8192
+                .equ    MC_TABLE_SIZE, 1024
+                .endif      
+
+                .equ    MC_RAM_WIDTH, (NUM_CPUS + NUM_LINKS)
+                .equ    MC_RAM_MASK, ((1 << MC_RAM_WIDTH) - 1)
+
+                .equ    P2P_EPW, 8                       @ Entries per word
+                .equ    P2P_LOG_EPW, 3                       @ Log of entries per word
+                .equ    P2P_EMASK, (P2P_EPW-1)             @ Entries per word - 1
+                .equ    P2P_BPE, 3                       @ Bits per entry
+                .equ    P2P_BMASK, 7                       @ Mask for entry bits
+
+                .equ    P2P_INIT, 0x00db6db6              @ All thrown away!
+
+                .equ    RTR_P2P_BASE, (RTR_BASE + 0x00010000)
+                .equ    RTR_P2P_TOP, (RTR_P2P_BASE + P2P_TABLE_SIZE * 4)
+
+                .equ    RTR_MCRAM_BASE, (RTR_BASE + 0x00004000)
+                .equ    RTR_MCRAM_TOP, (RTR_MCRAM_BASE + MC_TABLE_SIZE * 4)
+                .equ    RTR_MCKEY_BASE, (RTR_BASE + 0x00008000)
+                .equ    RTR_MCMASK_BASE, (RTR_BASE + 0x0000c000)
+
+                .equ    MC_CAM_WIDTH, 32
+
+@------------------------------------------------------------------------------
+
+@ System controller definitions
+
+                .equ    SYSCTL_BASE, 0xf2000000
+
+                .equ    SC_CODE, 0x5ec00000
+
+                .ifdef  TEST_CHIP
+                .equ    CHIP_ID, 0x59100902
+                .else       
+                .equ    CHIP_ID, 0x59111012
+                .endif      
+
+                .equ    SC_CHIP_ID, 0x00
+                .ifdef  TLM
+                .equ    SC_TUBE, 0x00
+                .endif      
+                .equ    SC_CPU_DIS, 0x04
+                .equ    SC_SET_IRQ, 0x08
+                .equ    SC_CLR_IRQ, 0x0c
+                .equ    SC_SET_OK, 0x10
+                .equ    SC_CPU_OK, 0x10
+                .equ    SC_CLR_OK, 0x14
+
+                .equ    SC_SOFT_RST_L, 0x18
+                .equ    SC_HARD_RST_L, 0x1c
+                .equ    SC_SUBS_RST_L, 0x20
+
+                .equ    SC_SOFT_RST_P, 0x24
+                .equ    SC_HARD_RST_P, 0x28
+                .equ    SC_SUBS_RST_P, 0x2c
+
+                .equ    SC_RST_CODE, 0x30
+                .equ    SC_MON_ID, 0x34
+
+                .equ    SC_MISC_CTRL, 0x38
+
+                .ifdef  TEST_CHIP
+                .equ    SC_MISC_STAT, 0x3c
+                .else       
+                .equ    GPIO_RES, 0x3c
+                .endif      
+
+                .equ    GPIO_PORT, 0x40
+                .equ    GPIO_DIR, 0x44
+                .equ    GPIO_SET, 0x48
+                .equ    GPIO_CLR, 0x4c
+                .equ    GPIO_READ, 0x48
+
+                .equ    SC_PLL1, 0x50
+                .equ    SC_PLL2, 0x54
+
+                .ifdef  TEST_CHIP
+                .equ    SC_TORIC1, 0x58
+                .equ    SC_TORIC2, 0x5c
+                .else       
+                .equ    SC_FLAG, 0x58
+                .equ    SC_SETFLAG, 0x58
+                .equ    SC_CLRFLAG, 0x5c
+                .endif      
+
+                .equ    SC_CLKMUX, 0x60
+                .equ    SC_SLEEP, 0x64
+
+                .ifdef  TEST_CHIP
+                .else       
+                .equ    SC_TS0, 0x68
+                .equ    SC_TS1, 0x6c
+                .equ    SC_TS2, 0x70
+                .endif      
+
+                .equ    SC_ARB0, 0x080
+                .equ    SC_TAS0, 0x100
+                .equ    SC_TAC0, 0x180
+
+                .ifdef  TEST_CHIP
+                .equ    SC_MISC_TEST, 0x200
+                .equ    SC_LINK_DIS, 0x204
+                .else       
+                .equ    SC_LINK_DIS, 0x200
+                .endif      
+
+                .equ    RST_POR, 0
+                .equ    RST_WDT, 1
+                .equ    RST_USER, 2
+                .equ    RST_SW, 3
+                .equ    RST_WDI, 4
+
+@------------------------------------------------------------------------------
+
+@ Watchdog timer definitions
+
+                .equ    WDOG_BASE, 0xf3000000
+
+                .equ    WD_LOAD, 0x00
+                .equ    WD_COUNT, 0x04
+                .equ    WD_CTRL, 0x08
+                .equ    WD_INTCLR, 0x0c
+                .equ    WD_RAWINT, 0x10
+                .equ    WD_MSKINT, 0x14
+                .equ    WD_LOCK, 0xc00
+
+                .equ    WD_CODE, 0x1acce551
+
+                .equ    WD_INT_B, 1
+                .equ    WD_RST_B, 2
+
+@------------------------------------------------------------------------------
+
+@ Ethernet definitions
+
+                .equ    ETH_BASE, 0xf4000000
+
+                .equ    ETH_TX_BASE, (ETH_BASE + 0x0000)
+                .equ    ETH_TX_SIZE, 0x0600
+                .equ    ETH_TX_TOP, (ETH_TX_BASE + ETH_TX_SIZE)
+
+                .equ    ETH_RX_BASE, (ETH_BASE + 0x4000)
+                .equ    ETH_RX_SIZE, 0x0c00
+                .equ    ETH_RX_TOP, (ETH_RX_BASE + ETH_RX_SIZE)
+
+                .equ    ETH_RX_DESC_RAM, (ETH_BASE + 0x8000)
+                .equ    ETH_REGS, (ETH_BASE + 0xc000)
+
+                .equ    ETH_CONTROL, 0x00
+                .equ    ETH_STATUS, 0x04
+                .equ    ETH_TX_LEN, 0x08
+                .equ    ETH_TX_CMD, 0x0c
+                .equ    ETH_RX_CMD, 0x10
+                .equ    ETH_MAC_LO, 0x14
+                .equ    ETH_MAC_HI, 0x18
+                .equ    ETH_PHY_CTRL, 0x1c
+                .equ    ETH_INT_CLR, 0x20
+                .equ    ETH_RX_BUF_RP, 0x24
+                .equ    ETH_RX_DESC_RP, 0x2c
+
+                .equ    ETH_TX_CLR, 0x01
+                .equ    ETH_RX_CLR, 0x10
+
+@ Bits in ETH_PHY_CTRL
+
+                .equ    PHY_CTRL_NRST, 1
+                .equ    PHY_CTRL_DIN, 2
+                .equ    PHY_CTRL_DOUT, 4
+                .equ    PHY_CTRL_OE, 8
+                .equ    PHY_CTRL_CLK, 16
+
+@------------------------------------------------------------------------------
+
+@ Spinnaker packet definitions
+
+                .equ    PKT_MC, 0x00000000
+                .equ    PKT_P2P, 0x00400000
+                .equ    PKT_NN, 0x00800000
+                .equ    PKT_NND, 0x00a00000
+                .equ    PKT_FR, 0x00c00000
+
+                .equ    PKT_MASK, 0x00c00000
+
+                .equ    P2P_TYPE_BITS, 0x00030000
+
+                .ifdef  TEST_CHIP
+                .equ    TCR_MC, (PKT_MC  + 0x07000000)
+                .equ    TCR_P2P, (PKT_P2P + 0x07000000)
+                .equ    TCR_NN, (PKT_NN  + 0x07000000)
+                .equ    TCR_NND, (PKT_NND + 0x07000000)
+                .equ    TCR_FR, (PKT_FR  + 0x07000000)
+                .else       
+                .equ    TCR_MC, PKT_MC
+                .equ    TCR_P2P, PKT_P2P
+                .equ    TCR_NN, PKT_NN
+                .equ    TCR_NND, PKT_NND
+                .equ    TCR_FR, PKT_FR
+                .endif      
+
+                .equ    TCR_PAYLOAD, 0x00020000
+                .equ    RSR_PAYLOAD, 0x00020000
+
+                .equ    TCR_MC_P, (TCR_MC  + TCR_PAYLOAD)
+                .equ    TCR_P2P_P, (TCR_P2P + TCR_PAYLOAD)
+                .equ    TCR_NN_P, (TCR_NN  + TCR_PAYLOAD)
+                .equ    TCR_NND_P, (TCR_NND + TCR_PAYLOAD)
+                .equ    TCR_FR_P, (TCR_FR  + TCR_PAYLOAD)
+
+@------------------------------------------------------------------------------
+
+@ Handy constants that point to hardware
+
+@------------------------------------------------------------------------------
+
+@ PHY registers
+
+                .equ    PHY_CONTROL, 0
+                .equ    PHY_STATUS, 1
+                .equ    PHY_ID1, 2
+                .equ    PHY_ID2, 3
+                .equ    PHY_AUTO_ADV, 4
+                .equ    PHY_AUTO_LPA, 5
+                .equ    PHY_AUTO_EXP, 6
+                .equ    PHY_SI_REV, 16
+                .equ    PHY_MODE_CSR, 17
+                .equ    PHY_SP_MODE, 18
+                .equ    PHY_ERR_COUNT, 26
+                .equ    PHY_SP_CSIR, 27
+                .equ    PHY_INT_SRC, 29
+                .equ    PHY_INT_MASK, 30
+                .equ    PHY_SP_CSR, 31
+
+@------------------------------------------------------------------------------
+
+@ ARM CPSR bits
+
+                .equ    MODE_USER, 0x10
+                .equ    MODE_FIQ, 0x11
+                .equ    MODE_IRQ, 0x12
+                .equ    MODE_SVC, 0x13
+                .equ    MODE_ABT, 0x17
+                .equ    MODE_UND, 0x1b
+                .equ    MODE_SYS, 0x1f
+
+                .equ    THUMB_BIT, 0x20
+
+                .equ    IMASK_IRQ, 0x80
+                .equ    IMASK_FIQ, 0x40
+                .equ    IMASK_ALL, 0xc0
+
+@------------------------------------------------------------------------------
+
+@ Default stack pointers
+
+                .equ    IRQ_STACK, DTCM_TOP
+                .equ    IRQ_SIZE, 256
+
+                .equ    FIQ_STACK, (IRQ_STACK - IRQ_SIZE)
+                .equ    FIQ_SIZE, 256
+
+                .equ    SVC_STACK, (FIQ_STACK - FIQ_SIZE)
+
+@------------------------------------------------------------------------------
+
+@ Misc definitions
+
+                .equ    MAX_CPUS, 20                      @ Do not exceed!
+
+                .equ    BUF_SIZE, 256                     @ Size of SDP buffer
+
+                .equ    NULL, 0                       @ Null pointer value
+
+                .equ    MONITOR_CPU, 0                       @ Virtual CPU number
+
+                .equ    ROM_IMAGE1, 0xffff4000              @ Check this
+
+                .equ    BIT_31, 0x80000000              @ Bit number defs
+                .equ    BIT_30, 0x40000000
+                .equ    BIT_29, 0x20000000
+                .equ    BIT_0, 0x00000001
+
+                .equ    DEAD_WORD, 0xdeaddead              @ Pad word value
+
+                .equ    SW_UNKNOWN, 0                       @ Software versions
+                .equ    SW_SCAMP, 1
+
+@------------------------------------------------------------------------------
+
+@ APLX definitions
+
+                .equ    APLX_END, 0xffffffff
+
+                .equ    APLX_ACOPY, 1
+                .equ    APLX_RCOPY, 2
+                .equ    APLX_FILL, 3
+                .equ    APLX_EXEC, 4
+
+                .equ    APLX_SIZE, 16
+
+@------------------------------------------------------------------------------
+
+                .equ    P2P_TYPE_SDP, (0 << 16)
+
+                .equ    P2P_CTRL, (1 << 24)
+
+                .equ    P2P_OPEN_REQ, (9 << 24)
+                .equ    P2P_OPEN_ACK, (1 << 24)
+                .equ    P2P_DATA_ACK, (3 << 24)
+                .equ    P2P_CLOSE_REQ, (5 << 24)
+                .equ    P2P_CLOSE_ACK, (7 << 24)
+
+                .equ    P2P_DEF_SQL, 4                       @ Seq len = 2^4
+
+@------------------------------------------------------------------------------
+
+                .equ    CMD_VER, 0
+                .equ    CMD_RUN, 1
+                .equ    CMD_READ, 2
+                .equ    CMD_WRITE, 3
+                .equ    CMD_APLX, 4
+
+                .equ    CMD_AP_MAX, 15
+
+                .equ    CMD_LINK_PROBE, 16
+                .equ    CMD_LINK_READ, 17
+                .equ    CMD_LINK_WRITE, 18
+                .equ    CMD_xxx_19, 19
+
+                .equ    CMD_NNP, 20
+                .equ    CMD_P2PC, 21
+                .equ    CMD_PING, 22
+                .equ    CMD_FFD, 23
+
+                .equ    CMD_AS, 24
+                .equ    CMD_LED, 25
+                .equ    CMD_IPTAG, 26
+                .equ    CMD_SROM, 27
+
+                .equ    CMD_TUBE, 64
+
+                .equ    RC_OK, 0x80                    @ Command completed OK
+                .equ    RC_LEN, 0x81                    @ Bad packet length
+                .equ    RC_SUM, 0x82                    @ Bad checksum
+                .equ    RC_CMD, 0x83                    @ Bad/invalid command
+                .equ    RC_ARG, 0x84                    @ Invalid arguments
+                .equ    RC_PORT, 0x85                    @ Bad port number
+                .equ    RC_TIMEOUT, 0x86                    @ Timeout
+                .equ    RC_ROUTE, 0x87                    @ No P2P route
+                .equ    RC_CPU, 0x88                    @ Bad CPU number
+                .equ    RC_DEAD, 0x89                    @ SHM dest dead
+                .equ    RC_BUF, 0x8a                    @ No free SHM buffers
+                .equ    RC_P2P_NOREPLY, 0x8b                    @ No reply to open
+                .equ    RC_P2P_REJECT, 0x8c                    @ Open rejected
+                .equ    RC_P2P_BUSY, 0x8d                    @ Dest busy
+                .equ    RC_P2P_TIMEOUT, 0x8e                    @ Dest died?
+                .equ    RC_PKT_TX, 0x8f                    @ Pkt Tx failed
+
+                .equ    TYPE_BYTE, 0
+                .equ    TYPE_HALF, 1
+                .equ    TYPE_WORD, 2
+
+@------------------------------------------------------------------------------
+
+@ IPTAG definitions
+
+                .equ    IPTAG_NEW, 0
+                .equ    IPTAG_SET, 1
+                .equ    IPTAG_GET, 2
+                .equ    IPTAG_CLR, 3
+                .equ    IPTAG_AUTO, 4
+
+                .equ    IPTAG_MAX, IPTAG_AUTO
+
+                .equ    IPTAG_VALID, 0x8000                  @ Entry is valid
+                .equ    IPTAG_TRANS, 0x4000                  @ Entry is transient
+                .equ    IPTAG_ARP, 0x2000                  @ Awaiting ARP resolution
+
+                .equ    TAG_NONE, 255                     @ Invalid tag/transient request
+                .equ    TAG_HOST, 0                       @ Reserved for host
+
+@------------------------------------------------------------------------------
+
+@ Bits in SDP Flags byte
+
+                .equ    SDPF_REPLY, 0x80                    @ Spare
+                .equ    SDPF_xxx_40, 0x40                    @ Spare
+                .equ    SDPF_SUM, 0x20                    @ Checksum before routing
+                .equ    SDPF_DP2P, 0x10                    @ Disable P2P check in routing
+                .equ    SDPF_DLINK, 0x08                    @ Disable Link check in routing
+                .equ    SDPF_LMASK, 0x07                    @ Link bits mask
+
+@------------------------------------------------------------------------------
+
+@ Allcations of SysCtl Test & Set registers (locks)
+
+                .equ    LOCK_MSG, 0
+                .equ    LOCK_MBOX, 1
+                .equ    LOCK_ETHER, 2
+                .equ    LOCK_GPIO, 3
+                .equ    LOCK_API_ROOT, 4
+
+@------------------------------------------------------------------------------
+
+@ NN opcodes
+@ Codes < 8 have propagation limited by the ID field in the packet.
+@ Codes >= 8 have various other ways of handling propagation.
+@ Codes with bit 2 clear (0-3, 8-11) have explicit FwdRty in the packet.
+@ Codes with bit 2 set (4-7, 12-15) use stored FwdRty parameters
+
+                .equ    NN_CMD_SIG0, 0                       @ Misc (GTPC, Set FwdRty, LED, etc)
+                .equ    NN_CMD_RTRC, 1                       @ Router Control Reg
+                .equ    NN_CMD_LTPC, 2                       @ Local Time Phase Ctrl (ID=0, Fwd=0)
+                .equ    NN_CMD_SP_3, 3
+
+                .equ    NN_CMD_SIG1, 4                       @ Misc (MEM, etc)
+                .equ    NN_CMD_P2PC, 5                       @ P2P Address setup
+                .equ    NN_CMD_FFS, 6                       @ Flood fill start
+                .equ    NN_CMD_SP_7, 7
+
+                .equ    NN_CMD_PING, 8                       @ Hop count limited
+                .equ    NN_CMD_P2PB, 9                       @ Hop count limited
+                .equ    NN_CMD_SDP, 10                      @ ** Handled specially
+                .equ    NN_CMD_SP_11, 11                      @ Spare
+
+                .equ    NN_CMD_FBS, 12                      @ Filtered in FF code
+                .equ    NN_CMD_FBD, 13
+                .equ    NN_CMD_FBE, 14
+                .equ    NN_CMD_FFE, 15
+
+                .equ    NN_SDP_KEY, ((0x50 + NN_CMD_SDP) << 24)
+
+@------------------------------------------------------------------------------
+
+@ Clock & PLL definitions
+
+                .equ    CLK_XTAL_MHZ, 10                      @ Crystal frequency (MHz)
+
+                .equ    PLL_300, 0x0007011e              @ Assuming 10MHz in
+                .equ    PLL_400, 0x00070128              @
+
+                .equ    PLL_260, 0x0007011a              @
+                .equ    PLL_330, 0x00070121              @
+
+                .equ    PLL_LOCK_TIME, 80                      @ Microseconds
+
+                .ifdef  TEST_CHIP
+                .equ    PLL_CLK_SEL, 0x9b000165              @ CPU/2, SYS/3, RTR/2, MEM/1
+                .else       
+                .equ    PLL_CLK_SEL, 0x809488a5              @ CPU/2, SYS/3, RTR/3, MEM/1
+                .endif      
+
+@------------------------------------------------------------------------------
+
+@ Bits in GPIO[31:0]
+
+@ Serial ROM
+
+                .equ    SERIAL_SO, 0x04                    @ In
+                .equ    SERIAL_SI, 0x08                    @ Out
+                .equ    SERIAL_CLK, 0x10                    @ Out
+                .equ    SERIAL_NCS, 0x20                    @ Out
+
+                .equ    SERIAL_OE, (SERIAL_NCS + SERIAL_CLK + SERIAL_SI)
+
+@ Hardware (PCB) versions
+
+                .equ    GPIO_HW_VER, 0x3f                    @ HW version on 5:2
+
+                .equ    HW_VER_S2, 0                       @ Spin2 Test Card
+                .equ    HW_VER_S3, 8                       @ Spin3 (Bunny) Card
+
+@ LED definitions
+
+                .equ    LED_0, 0x01                    @ Green LED on bit 0
+
+@ On-chip SDRAM
+
+                .equ    SDRAM_TQ, BIT_31
+                .equ    SDRAM_DPD, BIT_30
+                .equ    SDRAM_HERE, BIT_29
+
+@ Handshaking IO with ARM board
+
+                .equ    SER_OUT_0, 0x01
+                .equ    SER_OUT_1, 0x02
+
+                .equ    SER_OUT, (SER_OUT_0 + SER_OUT_1)
+
+                .equ    SER_IN_0, 0x40
+                .equ    SER_IN_1, 0x80
+
+                .equ    SER_IN, (SER_IN_0 + SER_IN_1)
+
+@------------------------------------------------------------------------------
+
+@ Failure codes
+
+@ Non-zero causes CPU to sleep
+@ Bit 6 set causes CPU_OK bit to be cleared
+@ Bit 5 set causes LED3 to be turned on
+
+@ HW errors have bit 7 set & bit 6 set
+@ SW errors have bit 7 set & bit 6 clr
+
+                .equ    FAIL_RESET, 0xc0                    @ Catch-all - set at reset
+                .equ    FAIL_ROMX, 0xc1                    @ Exception in ROM code
+                .equ    FAIL_ITCM0, 0xc2                    @ ITCM top 512 failure
+                .equ    FAIL_ITCM1, 0xc3                    @ ITCM main test failure
+                .equ    FAIL_DTCM, 0xc4                    @ DTCM test failure
+
+                .equ    FAIL_TIMER, 0xc5                    @ Timer reg test failed
+                .equ    FAIL_VIC, 0xc6                    @ VIC reg test failed
+                .equ    FAIL_CC, 0xc7                    @ Comms ctlr reg test failed
+                .equ    FAIL_DMA, 0xc8                    @ DMAC reg test failed
+
+                .equ    FAIL_MP, 0xc9                    @ Previous monitor proc failure
+                .equ    FAIL_LATE, 0xca                    @ App CPU failed to set CPU_OK
+                .equ    FAIL_MANUF, 0xcb                    @ App CPU in manuf test
+                .equ    FAIL_SLEEP, 0xcc                    @ Ordered to sleep in startup
+
+                .equ    FAIL_TLM, 0xcf                    @ Special for TLM
+
+                .equ    FAIL_VEC, 0xa0                    @ Unhandled exception
+
+@------------------------------------------------------------------------------
+
+@ Assorted typedefs
+
+@  uint data[];
+@  uint buf[];
+@------------------------------------------------------------------------------
+
+@ SV (System) RAM definitions - these are at f5003xxx in TEST_CHIP
+
+                .equ    SV_SSIZE, 32                      @ Initialised from SROM
+                .equ    SV_USIZE, 96                      @ Not initialised
+                .equ    SV_ISIZE, 128                     @ Initialised to 0
+                .equ    SV_VSIZE, 32                      @ Reset vectors
+                .equ    SV_PSIZE, 64                      @ Spare
+                .equ    SV_RSIZE, 64                      @ Random
+                .equ    SV_MSIZE, (8 * MAX_CPUS)          @ MP MBOXes (20 @ 8 bytes)
+                .equ    SV_ASIZE, (8 * MAX_CPUS)          @ AP MBOXes (20 @ 8 bytes)
+
+                .equ    SV_SBASE, (SYSRAM_TOP - SV_SSIZE) @ f5007fe0
+                .equ    SV_UBASE, (SV_SBASE - SV_USIZE)   @ f5007f80
+                .equ    SV_IBASE, (SV_UBASE - SV_ISIZE)   @ f5007f00
+                .equ    SV_BASE, SV_IBASE                @ f5007f00
+
+                .equ    SV_VBASE, (SV_IBASE - SV_VSIZE)   @ f5007ee0
+                .equ    SV_PBASE, (SV_IBASE - SV_PSIZE)   @ f5007ea0 BUG but do not fix !!
+                .equ    SV_RBASE, (SV_PBASE - SV_RSIZE)   @ f5007e60
+                .equ    SV_ABASE, (SV_RBASE - SV_ASIZE)   @ f5007dc0
+                .equ    SV_MBASE, (SV_ABASE - SV_MSIZE)   @ f5007d20
+
+@ Offsets from SV_BASE
+
+                .equ    SROM_FLAG_BASE, (SV_SBASE + 0)          @ f5007fe0
+                .equ    STATUS_MAP_BASE, (SV_UBASE + 0)          @ f5007f60
+                .equ    RST_BLOCK_BASE, (SV_VBASE + 0)          @ f5007ee0
+
+@ Bits in srom_data->flags
+
+                .equ    SRF_PRESENT, 0x8000                  @ SROM present
+                .equ    SRF_HW_VER, 0x00f0                  @ Hardware version
+                .equ    SRF_PHY_INIT, 0x0008                  @ Init PHY on startup
+                .equ    SRF_PHY_RST, 0x0004                  @ Reset PHY on startup
+                .equ    SRF_HI_LED, 0x0002                  @ LEDs active high
+                .equ    SRF_ETH, 0x0001                  @ Ethernet present
+                .equ    SRF_NONE, 0x0000                  @ None of the above
+
+@ Pointers to ap_mbox[], mp_mbox[] in SYSRAM
+
+@ struct which sits at top of SysRAM
+
+

@@ -1,0 +1,29 @@
+#
+# Scatter load file for applications
+#
+
+APLX_IMAGE 0
+{
+	APLX 0 OVERLAY
+    	{
+		spin1_api_lib.o  (sark_aplx, +FIRST)
+    	}
+
+      	ITCM 0 OVERLAY
+  	{   
+    	    	spin1_api_lib.o (sark_init, +FIRST)
+    		* (+RO)
+		spin1_api_lib.o (sark_align, +LAST)
+  	}
+
+  	DTCM 0x00400000
+  	{
+    		* (+RW)
+		* (+ZI)
+  	}
+
+	ARM_LIB_STACKHEAP +0x0 EMPTY 0x1000
+	{
+	
+	}
+}

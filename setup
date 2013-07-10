@@ -1,0 +1,178 @@
+#!/bin/bash
+set -e
+source ./source.sh
+MY_DIR=$(pwd)
+
+
+make_api()
+{
+cd src
+cd spin1_api
+cd src
+make -f $MAKEFILE_SPINN_API clean
+make -f $MAKEFILE_SPINN_API
+cd $MY_DIR
+}
+
+make_lookup_table_generator()
+{
+cd binary_files_generation
+make clean
+make
+cd $MY_DIR
+}
+
+
+update_links()
+{
+echo -e "checking write permission on $MY_PYNN/../"
+if [ -w "$MY_PYNN/../" ]; 
+    then
+        echo -e "# updating python links"
+        rm -f "$MY_PYNN/../pacman"
+        ln -svf "$(pwd)/pacman" "$MY_PYNN/../pacman"
+
+        rm -f "$MY_PYNN/spiNNaker"
+        ln -svf "$(pwd)/pyNN.spiNNaker" "$MY_PYNN/spiNNaker"
+
+        rm -f "$MY_PYNN/../binary_files_generation"
+        ln -svf "$(pwd)/binary_files_generation" "$MY_PYNN/../binary_files_generation"
+    else
+        echo -e "\n!!! ATTENTION !!! You don't have the permissions to write to $MY_PYNN/../\n"
+        echo -e "Please become superuser and run setup -l\n"
+#        su -c " ./update_package.sh -l"
+        exit 2
+fi
+}
+
+make_model_library()
+{
+cd pacman/sql
+./update_model_library.sh
+cd $MY_DIR
+}
+
+make_models()
+{
+    cd src/app_frame/build
+    
+    # make neuron models
+    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API lif
+    make -f $MAKEFILE_SPINN_API lif_cond
+    make -f $MAKEFILE_SPINN_API izhikevich
+    
+    # make stdp
+    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API lif_stdp
+    make -f $MAKEFILE_SPINN_API lif_cond_stdp
+    make -f $MAKEFILE_SPINN_API izhikevich_stdp
+
+    # make stdp_sp
+    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API lif_stdp_sp
+    make -f $MAKEFILE_SPINN_API lif_cond_stdp_sp
+    make -f $MAKEFILE_SPINN_API izhikevich_stdp_sp
+
+    # make stdp_tts (only izhikevich)
+    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API izhikevich_stdp_tts    
+    
+    # cleaning up
+    make -f $MAKEFILE_SPINN_API clean    
+    cd $MY_DIR
+    
+    cd src/app_spike_source/build
+    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API spike_source
+    make -f $MAKEFILE_SPINN_API spike_source_array
+    make -f $MAKEFILE_SPINN_API spike_source_poisson    
+    cd ..
+    
+    cd $MY_DIR
+    cd src/app_dump/build
+    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API
+#    ln -sfv $(pwd)/spike_receiver.py ../../../tools
+    cd $MY_DIR
+    
+    cd $MY_DIR
+    cd src/app_proxy/build
+    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API
+    cd $MY_DIR
+
+    # NEF part    
+    cd $MY_DIR
+    cd src/app_frame_nef/build
+    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API lif_32
+    make -f $MAKEFILE_SPINN_API nef_out_1d
+    make -f $MAKEFILE_SPINN_API lif_nef_1d
+
+    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API nef_out_2d
+    make -f $MAKEFILE_SPINN_API lif_nef_2d
+    
+    cd $MY_DIR
+}
+
+setup_nengo()
+{
+    echo -e "Building spiNNaker package in $(pwd)..."
+    ln -svf $(pwd)/binaries $MY_NENGO
+#    ln -svf $(pwd)/binaries/nengo_values.py $(pwd)/nengo_values.py
+    ln -svf $(pwd)/nengo_spinnaker_interface $MY_NENGO
+    ln -svf $(pwd)/nengo_spinnaker_interface/nengo-cl-spinnaker $MY_NENGO
+    
+}
+
+make_package()
+{
+echo -e "Building spiNNaker package in $(pwd)..."
+
+echo -e "\nMaking API...\n"
+make_api
+
+#echo -e "\nMaking Lookup table generator...\n"
+#make_lookup_table_generator
+
+echo -e "\nMaking Model Library...\n"
+make_model_library
+
+echo -e "\nMaking Models...\n"
+make_models
+
+echo -e "\nUpdating links... (you might need to be superuser to perform this last step)\n"
+update_links
+
+cd $MY_DIR
+}
+
+
+
+### this is the main
+
+echo "Usage: ./setup [-a|-f|-l|-m|-n]"
+echo -e "\t-a   :   make all models"
+echo -e "\t-d   :   update model library"
+echo -e "\t-l   :   update links"
+echo -e "\t-m   :   make full package"
+echo -e "\t-n   :   setup nengo interface"
+
+while getopts adlmnt option
+do
+        case "${option}"
+        in
+                a) echo -e "make all models"; make_models;;
+                d) echo -e "make model_library DB"; make_model_library;;
+                l) echo -e "update links"; update_links;;
+                m) echo -e "make full package"; make_package;;                
+                n) echo -e "setup nengo interface"; setup_nengo;;                
+
+
+        esac
+done
+
+
+

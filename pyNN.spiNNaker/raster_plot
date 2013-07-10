@@ -1,0 +1,17 @@
+#!/usr/bin/python
+import pylab
+import sys, os
+import numpy
+
+print "Usage: raster_plot <spike_data_file>"
+
+if len(sys.argv) < 2:
+    print "missing argument"
+    sys.exit(1)
+
+filename = sys.argv[1]
+
+data = numpy.loadtxt(filename)
+pylab.scatter(data[:,0], data[:,1], c='green', s=1)
+
+pylab.show()

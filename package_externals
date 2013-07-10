@@ -1,0 +1,14 @@
+pyNN.spiNNaker https://solem.cs.man.ac.uk/svn/PACMAN/testing/pyNN.spiNNaker
+pacman https://solem.cs.man.ac.uk/svn/PACMAN/testing/pacman
+binary_files_generation https://solem.cs.man.ac.uk/svn/PACMAN/testing/binary_files_generation
+nengo_spinnaker_interface https://solem.cs.man.ac.uk/svn/PACMAN/testing/nengo_spinnaker_interface
+src/app_frame https://solem.cs.man.ac.uk/svn/app_frame/testing
+src/app_spike_source https://solem.cs.man.ac.uk/svn/app_spike_source/testing
+src/app_dump https://solem.cs.man.ac.uk/svn/app_dump/testing
+src/app_frame_nef https://solem.cs.man.ac.uk/svn/app_frame_nef/testing
+src/spin1_api https://solem.cs.man.ac.uk/svn/spin1_api/testing
+src/app_proxy https://solem.cs.man.ac.uk/svn/app_proxy/testing
+tools https://solem.cs.man.ac.uk/svn/tools/testing
+tools/spikeserver https://solem.cs.man.ac.uk/svn/spikeserver/testing
+tools/visualiser https://solem.cs.man.ac.uk/svn/visualiser_real_time/testing
+

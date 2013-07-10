@@ -1,0 +1,13 @@
+/* -------------------------- */
+/* Example applications files */
+/* -------------------------- */
+
+
+arm.make	     - Makefile for ARM tools
+example.lnk          - GNU linker script to link examples
+example.sct          - ARM linker script to link examples
+gnu.make	     - Makefile for GNU tools
+run_simple	     - ybug script to run "simple" example
+sdping.c             - SDP packet send and receive, host communication
+sdping.pl            - perl script -- host software for SDP communication
+simple.c             - simple timer, DMA and MC packet callbacks

@@ -1,0 +1,592 @@
+#!/usr/bin/perl
+
+##------------------------------------------------------------------------------
+##
+## tubotron	    An application for displaying output from SpiNNaker systems
+##
+## Copyright (C)    The University of Manchester - 2009, 2010
+##
+## Author           Steve Temple, APT Group, School of Computer Science
+## Email            temples@cs.man.ac.uk
+##
+##------------------------------------------------------------------------------
+
+
+use strict;
+use warnings;
+
+use Tk;
+
+use Fcntl;
+use IO::Socket::INET;
+
+my $version = '1.01';
+
+my $net = 0;
+
+my $fifo = 'log.fifo';
+my $pipe_fh;
+my $pipe_text;
+
+my $logfile = 'tubotron.log';
+my $log_fh;
+
+my $debug = 0;
+my $max_lines = 10000;
+
+my $port = 17892;
+my $socket;
+my $socket_fd;
+
+my ($main, $top_label, $frame, $title, $pause_but);
+my ($clear_menu, $save_menu, $open_menu, $close_menu);
+
+my $height = 10;
+
+my $win_count = 0;
+my $open_count = 0;
+my $paused = 0;
+
+my %windows;
+my %xbm;
+
+my $include = '.*';
+
+
+sub usage
+{
+    warn "usage: tubotron <args>\n";
+    warn "  -net                - take input from UDP port\n";
+    warn "  -port    <num>      - set UDP port number (default $port)\n";
+    warn "  -height  <num>      - set window height (range 4-80, default 10)\n";
+    warn "  -lines   <num>      - set max lines kept in window (default 10k)\n";
+    warn "  -include <regexp>   - only open windows matching <regexp>\n";
+    warn "  -debug              - set debug variable\n";
+    warn "  -log                - log in $logfile\n";
+    warn "  -version            - print version number\n";
+    die  "  -net                - take input from UDP port\n";
+}
+
+
+sub process_args
+{
+    while ($#ARGV >= 0)
+    {
+	my $arg = shift @ARGV;
+
+	if ($arg eq '-log')
+	{
+	    die "can't open '$logfile'\n" unless open $log_fh, '>', $logfile;
+	    binmode ($log_fh, ":unix");
+	}
+	elsif ($arg eq '-debug')
+	{
+	    $debug++;
+	}
+	elsif ($arg eq '-lines')
+	{
+	    die "max_lines not specified\n" unless defined $ARGV[0] &&
+		$ARGV[0] =~ /^\d+$/;
+	    $max_lines = shift @ARGV;
+	}
+	elsif ($arg eq '-net')
+	{
+	    $net = 1;
+	}
+	elsif ($arg eq '-version')
+	{
+	    die "tubotron - v$version\n";
+	}
+	elsif ($arg eq '-height')
+	{
+	    die "bad height\n" unless defined $ARGV[0] && $ARGV[0] =~ /^\d+$/
+		&& $ARGV[0] >= 4 && $ARGV[0] <= 80;
+	    $height = shift @ARGV;
+	}
+	elsif ($arg eq '-port')
+	{
+	    die "port not specified\n" unless defined $ARGV[0] &&
+		$ARGV[0] =~ /^\d+$/;
+	    $port = shift @ARGV;
+	    $net = 1;
+	}
+	elsif ($arg eq '-include')
+	{
+	    die "include not specified\n" unless defined $ARGV[0];
+	    $include = shift @ARGV;
+	}
+	else
+	{
+	    usage ();
+	}
+    }
+
+    warn "Using include regex \"$include\"\n" unless $include eq '.*';
+}
+
+
+sub open_input
+{
+    if ($net)
+    {
+	$socket = new IO::Socket::INET (LocalPort => $port,
+					Proto => 'udp',
+					Blocking => 0);
+
+	die "failed to create socket: $!\n" unless $socket;
+
+	$socket_fd = fileno ($socket);
+    }
+    else
+    {
+	die "'$fifo' not found or not a FIFO\n" unless -r $fifo && -p $fifo;
+
+	die "Can't open '$fifo'\n" unless
+	    sysopen $pipe_fh, $fifo, O_NONBLOCK|O_RDONLY;
+    }
+}
+
+
+sub read_bitmaps
+{
+    my ($name, $xbm, $col);
+
+    while (<DATA>)
+    {
+	$xbm .= $_;
+	if (/define\s+(\S+)_width/)
+	{
+	    $name = $1;
+	    $col = 'black';
+	    $col = $1 if $name =~ /_([a-z]+)$/;
+	}
+	elsif (/;$/)
+	{
+	    $xbm{$name} = $main->Bitmap ($name, -data => $xbm, -fore => $col);
+	    $xbm = '';
+	}
+    }
+}
+
+
+sub quit
+{
+    close $log_fh if defined $log_fh;
+    $main->destroy;
+}
+
+
+sub pause
+{
+    $paused = 1 - $paused;
+
+    my $text = ($paused) ? 'Continue' : 'Pause';
+    my $colour = ($paused) ? 'red' : 'black';
+
+    $pause_but->configure (-text => $text, -activefore => $colour,
+			   -fg => $colour);
+    $main->after (10, \&poll_pipe) unless $paused;
+}
+
+
+sub win_status
+{
+    my $p = ($win_count == 1) ? '' : 's';
+    my $c = $win_count - $open_count;
+
+    $top_label->configure (-text =>
+        "$win_count window$p ($open_count open, $c closed)");
+}
+
+
+sub clear_all
+{
+    for my $name (keys %windows)
+    {
+	my $text = $windows{$name}->{text};
+	$text->delete ('0.0', 'end');
+    }
+}
+
+
+sub clear_win
+{
+    my $name = shift;
+
+    my $text = $windows{$name}->{text};
+    $text->delete ('0.0', 'end');
+}
+
+
+sub save_win
+{
+    my $name = shift;
+
+    my $text = $windows{$name}->{text};
+
+    $name .= '.txt';
+
+    if (open my $fh, '>', $name)
+    {
+	print $fh $text->get ('0.0', 'end');
+	close $fh;
+    }
+    else
+    {
+	warn "Can't open '$name'\n";
+    }
+}
+
+
+sub save_all
+{
+    for my $name (keys %windows)
+    {
+	my $text = $windows{$name}->{text};
+
+	$name .= '.txt';
+
+	if (open my $fh, '>', $name)
+	{
+	    print $fh $text->get ('0.0', 'end');
+	    close $fh;
+	}
+	else
+	{
+	    warn "Can't open '$name'\n";
+	}
+    }
+}
+
+
+sub close_win
+{
+    my $win = shift;
+
+    return if $windows{$win}->{closed};
+
+    $windows{$win}->{frame}->packForget;
+    $windows{$win}->{closed} = 1;
+
+    $open_menu->entryconfigure (0+$windows{$win}->{menu_entry},
+	-state => 'active');
+    $close_menu->entryconfigure (0+$windows{$win}->{menu_entry},
+	-state => 'disabled');
+
+    $open_count--;
+    win_status ();
+}
+
+
+sub open_win
+{
+    my $win = shift;
+
+    return unless $windows{$win}->{closed};
+
+    $windows{$win}->{frame}->pack (-fill => 'both', -expand => 1);
+    $windows{$win}->{closed} = 0;
+
+    $open_menu->entryconfigure (0+$windows{$win}->{menu_entry},
+	-state => 'disabled');
+    $close_menu->entryconfigure (0+$windows{$win}->{menu_entry},
+	-state => 'active');
+
+    $open_count++;
+    win_status ();
+}
+
+
+sub open_all
+{
+    open_win ($_) for (keys %windows)
+}
+
+
+sub close_all
+{
+    close_win ($_) for (keys %windows)
+}
+
+
+sub main_window
+{
+    my $text = ($net) ? "Port $port" : "Pipe $fifo";
+
+    $main = MainWindow->new (-title => "The Tubotron ($text)");
+
+    $frame = $main->Frame (-border => 2, -relief => 'groove');
+
+    my $clear_but = $frame->Menubutton (-text => 'Clear', -border => 2,
+	-relief => 'raised', -width => 6);
+
+    my $save_but = $frame->Menubutton (-text => 'Save', -border => 2,
+	-relief => 'raised', -width => 6);
+
+    my $open_but = $frame->Menubutton (-text => 'Open', -border => 2,
+	-relief => 'raised', -width => 6);
+
+    my $close_but = $frame->Menubutton (-text => 'Close', -border => 2,
+	-relief => 'raised', -width => 6);
+
+    my $quit_but = $frame->Button (-text => 'Quit', -command => \&quit);
+
+    $top_label = $frame->Label (-fg => 'blue', -anchor => 'w',
+				-text => 'Waiting ...');
+ 
+    $pause_but = $frame->Button (-text => 'Pause', -width => 6,
+				 -command => \&pause);
+
+    $clear_but->pack (-side => 'left');
+    $save_but->pack  (-side => 'left');
+    $open_but->pack  (-side => 'left');
+    $close_but->pack (-side => 'left');
+
+    $top_label->pack (-side => 'left', -expand => 1, -fill => 'x', -padx => 10);
+    $quit_but->pack  (-side => 'right');
+    $pause_but->pack (-side => 'right') unless $net;
+
+    $clear_menu = $clear_but->Menu (-tearoff => 0);
+    $save_menu  = $save_but->Menu  (-tearoff => 0);
+    $open_menu  = $open_but->Menu  (-tearoff => 0);
+    $close_menu = $close_but->Menu (-tearoff => 0);
+
+    $clear_menu->command (-label => '--- ALL ---', -command => \&clear_all);
+    $save_menu->command  (-label => '--- ALL ---', -command => \&save_all);
+    $open_menu->command  (-label => '--- ALL ---', -command => \&open_all);
+    $close_menu->command (-label => '--- ALL ---', -command => \&close_all);
+
+    $clear_but->configure (-menu => $clear_menu);
+    $save_but->configure  (-menu => $save_menu);
+    $open_but->configure  (-menu => $open_menu);
+    $close_but->configure (-menu => $close_menu);
+
+    $frame->pack (-fill => 'x');
+
+    $main->after (5, \&poll_net)   if     $net;
+    $main->after (10, \&poll_pipe) unless $net;
+}
+
+
+sub new_window
+{
+    my $win = shift;
+
+    my $frame = $main->Frame;
+    my $head = $frame->Frame;
+    my $label = $head->Label (-text => $win, -anchor => 'w', -bg => 'gray');
+    my $close = $head->Button (-image => $xbm{close_red},
+				-command => [\&close_win, $win]);
+    my $text = $frame->Scrolled ('Text', -scrollbars => 'oe', -wrap => 'none',
+				 -height => $height, -width => 80);
+
+    $windows{$win}->{frame} = $frame;
+    $windows{$win}->{text} = $text;
+    $windows{$win}->{menu_entry} = 1 + $win_count;
+    $windows{$win}->{closed} = 0;
+    $windows{$win}->{height} = $height;
+    $windows{$win}->{lines} = 0;
+
+    $label->pack (-side => 'left', -fill => 'x', -expand => 1);
+    $close->pack (-side => 'right');
+    $head->pack (-fill => 'x', -expand => 0);
+    $text->pack (-fill => 'both', -expand => 1);
+    $frame->pack (-fill => 'both', -expand => 1);
+
+    $clear_menu->insert ('end', 'command', -label => $win,
+			 -command => [\&clear_win, $win]);
+    $save_menu->insert ('end', 'command', -label => $win,
+			 -command => [\&save_win, $win]);
+    $open_menu->insert ('end', 'command', -label => $win,
+			 -command => [\&open_win, $win]);
+    $close_menu->insert ('end', 'command', -label => $win,
+			 -command => [\&close_win, $win]);
+
+    $open_menu->entryconfigure ('end', -state => 'disabled');
+
+    $win_count++;
+    $open_count++;
+    win_status ();
+
+    return $text;
+}
+
+
+sub add_text
+{
+    my ($win, $data) = @_;
+
+    return unless $win =~ /$include/;
+
+    my $text = $windows{$win}->{text};
+
+    $text = new_window ($win) unless defined $text;
+
+    $text->insert ('end', $data);
+    $text->see ('end');
+
+    return if $max_lines == 0;
+
+    my ($offset, $index) = (0, 0);
+
+    while (($index = index ($data, "\n", $offset)) != -1)
+    {
+	$offset = $index + 1;
+	$windows{$win}->{lines}++;
+    }
+
+    while ($windows{$win}->{lines} > $max_lines)
+    {
+	$windows{$win}->{text}->delete ('1.0', '2.0');
+	$windows{$win}->{lines}--;
+    }
+}
+
+
+sub poll_net
+{
+    $main->after (5, \&poll_net);
+
+    my $rm = '';
+    vec ($rm, $socket_fd, 1) = 1;
+
+    my $n = select ($rm, undef, undef, 0);
+    return if $n == 0;
+
+    my $buf;
+    my $addr = recv ($socket, $buf, 65536, 0);
+
+    unless (defined $addr)
+    {
+	warn "!! recv failed\n";
+	return;
+    }
+
+    my ($pad, $flags, $tag, $dp, $sp, $da, $sa, $cmd, $cf, $text) =
+	  unpack 'v C C C C v v v v a*', $buf;
+
+    my $x = $sa >> 8;
+    my $y = $sa & 255;
+
+    if ($cmd == 4 || $cmd == 64) # !! TUBE
+    {
+	my $win = "SpiNNaker:$x,$y,$sp";
+	add_text ($win, $text);
+	print $log_fh "$win <$text>\n" if defined $log_fh;
+    }
+    else
+    {
+	warn "!! bad command ($cmd)\n";
+    }
+
+    if ($debug > 0)
+    {
+	my $sep = (chomp $text) ? '\n' : '';
+
+	printf "... F=%02x T=$tag DP=$dp DA=$da SP=$sp SA=$sa CF=$cf CMD=$cmd", $flags;
+	printf " LEN=%d\n%s$sep\n", length $text, $text;
+
+#	printf "%02x ", $_ for (unpack 'C*', $text);
+#	print "\n";
+    }
+}
+
+
+sub process_pipe
+{
+    my $line = shift;
+    my $put = 0;
+
+    chomp $line;
+
+    if ($line =~ /^log (\S+) char (\d+)/) # Tube output
+    {
+	my ($win, $char) = ($1, $2);
+
+	add_text ($win, chr($char));
+    }
+    elsif ($line =~ /^sysRAM: (\S+) (\S+) = (\S+) @\s+(\d+)/) # SysRAM watcher
+    {
+	my ($win, $addr, $data, $time) = ($1, $2, $3, $4);
+
+	add_text ($win, "$addr = $data at $time\n");
+    }
+    elsif ($line =~ /^gpio: (\S+) = (\S+) (\S+) (\S+) @\s+(\d+)/) # GPIO watcher
+    {
+	my ($win, $addr, $data0, $data1, $time) = ($1, $2, $3, $4, $5);
+
+	add_text ($win, "$addr$data0$data1 at $time\n");
+    }
+    elsif ($line =~ /^router (\S+) packet received - RK=(\S+) @\s+(\d+) (ps|ns)\s+(\S*)/) # Router packet
+    {
+	my ($win, $pkt, $time, $err) = ($1, $2, $3, $5);
+
+	add_text ($win, "pkt 0x$pkt at $time $err\n");
+    }
+    elsif ($line =~ /^commsCtrl: (\S+) (\S+) = (\S+) @\s+(\d+)/) # commsCtrl watcher
+    {
+	my ($win, $addr, $data, $time) = ($1, $2, $3, $4);
+
+	add_text ($win, "$addr = $data at $time\n");
+    }
+    elsif ($line =~ /^\s+(\d+)\s+(\S+)\s+(\S+)\s(.+)$/) # CPU disassembly
+    {
+	my ($time, $units, $win, $data) = ($1, $2, $3, $4);
+
+	return if $win eq 'Data' && $data =~ /coproc/; # !! Bodge
+
+	if (length ($data) >= 35)
+	{
+	    substr ($data, 0, 36) = '';
+	    add_text ($win, "$data\n");
+	}
+    }
+    else
+    {
+	warn "!! Tubotron got \"$line\"\n";
+    }
+
+}
+
+
+sub poll_pipe
+{
+    $main->after (10, \&poll_pipe) unless $paused;
+
+    my $buf;
+    my $c = sysread ($pipe_fh, $buf, 1024);
+
+    return if !defined $c || $c <= 0;
+
+    syswrite $log_fh, $buf if defined $log_fh;
+
+    $pipe_text .= $buf;
+
+    my @lines = split /\n/, $pipe_text, -1;
+
+    if ($#lines > 0)
+    {
+	process_pipe ($lines[$_]) for (0..$#lines-1);
+	$pipe_text = $lines[-1];
+    }
+}
+
+
+process_args ();
+
+open_input ();
+
+main_window ();
+
+read_bitmaps ();
+
+Tk::MainLoop ();
+
+
+__DATA__
+#define close_red_width 14
+#define close_red_height 14
+static char close_red_bits[] = {
+   0x00, 0x00, 0x06, 0x18, 0x0e, 0x1c, 0x1c, 0x0e, 0x38, 0x07, 0xf0, 0x03,
+   0xe0, 0x01, 0xe0, 0x01, 0xf0, 0x03, 0x38, 0x07, 0x1c, 0x0e, 0x0e, 0x1c,
+   0x06, 0x18, 0x00, 0x00};

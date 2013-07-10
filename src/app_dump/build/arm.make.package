@@ -1,0 +1,26 @@
+LIB_DIR = ../../spin1_api/src
+INC_DIR = ../../spin1_api/src
+
+CC = armcc -c --c99 --apcs /interwork --cpu=ARM968E-S -I $(INC_DIR) -I ../inc -DDEBUG
+AS = armasm --apcs /interwork --keep --cpu=ARM968E-S -I ../inc
+LN = armlink --scatter=app_dump.sct
+
+
+APP_OBJECTS = main.o
+
+
+app_dump: $(APP_OBJECTS)
+	$(LN) --output app_dump.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS)
+	fromelf --bin app_dump.elf -o app_dump.aplx
+	fromelf -cds app_dump.elf -o app_dump.txt
+	cp app_dump.aplx ../../../binaries/app_monitoring.aplx
+	mv app_dump.aplx app_dump.elf ../bin
+	
+
+main.o: ../src/main.c
+	$(CC) ../src/main.c
+
+
+clean:
+	rm -rf *.o  *.txt ../bin/*
+	rm -rf ../doc/*.html ../doc/*.css ../doc/bin ../doc/build ../doc/inc ../doc/src

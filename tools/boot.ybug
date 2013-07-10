@@ -1,0 +1,9 @@
+### BOOTING ####
+boot ./scamp-2.boot
+sleep 4
+sver
+p2pc 2 2
+sleep 3
+sver
+
+

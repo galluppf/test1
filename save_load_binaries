@@ -1,0 +1,41 @@
+#!/bin/bash
+set -e
+BINARIES=binaries
+
+
+clean_binaries()
+{
+    echo "...cleaning $BINARIES"
+    rm -f $BINARIES/*
+}
+
+load_binaries()
+{
+    echo "...loading file $FILENAME into $BINARIES"
+    tar xzfv $FILENAME $BINARIES
+}
+
+save_binaries()
+{
+    echo "...saving file $FILENAME"
+    tar czf $FILENAME $BINARIES/*
+}
+
+echo "Usage: ./save_load_binaries [-l|-s] filename"
+echo "-l load a saved .tgz file into the ./binaries directory"
+echo -e "-s saves the content of the ./binaries directory into a .tgz file"
+echo -e "-c cleans the binaries directory\n"
+
+FILENAME=$2
+
+while getopts slc option
+do
+        case "${option}"
+        in
+                s) save_binaries;;
+                l) load_binaries;;
+                c) clean_binaries;;
+        esac
+done
+
+echo "...done"

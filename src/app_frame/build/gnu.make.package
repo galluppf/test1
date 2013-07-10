@@ -1,0 +1,283 @@
+.SECONDEXPANSION:
+
+LIB_DIR = ../../spin1_api/src
+INC_DIR = ../../spin1_api/src
+
+APP_OBJECTS = config.o comms.o recording.o
+
+FLAT_OBJECTS = dma.o main.o
+
+STDP_OBJECTS = dma_stdp.o stdp.o stdp_generic.o main_stdp.o
+
+STDP_SP_OBJECTS = dma_stdp_sp.o stdp_sp.o stdp_generic.o main_stdp_sp.o
+
+STDP_TTS_OBJECTS = dma_stdp_tts.o stdp_tts.o stdp_generic.o main_stdp_tts.o
+
+izhikevich_stdp : FLAGS = -DSTDP
+#izhikevich_stdp : APP_OBJECTS += stdp_generic.o stdp.o
+
+izhikevich_stdp_sp : FLAGS = -DSTDP_SP
+#izhikevich_stdp_sp : APP_OBJECTS += stdp_generic.o stdp_sp.o
+
+izhikevich_stdp_tts : FLAGS = -DSTDP_TTS
+#izhikevich_stdp_tts : APP_OBJECTS += stdp_generic.o stdp_tts.o
+
+lif_stdp : FLAGS = -DSTDP
+#lif_stdp : APP_OBJECTS += stdp_generic.o stdp.o
+
+lif_stdp_sp : FLAGS = -DSTDP_SP
+#lif_stdp_sp : APP_OBJECTS += stdp_generic.o stdp_sp.o
+
+lif_cond_stdp : FLAGS = -DSTDP
+#lif_cond_stdp : APP_OBJECTS += stdp_generic.o stdp.o
+
+lif_cond_stdp_sp : FLAGS = -DSTDP_SP
+#lif_cond_stdp_sp : APP_OBJECTS += stdp_generic.o stdp_sp.o
+
+
+CC := arm-none-linux-gnueabi-gcc -c -O1 -nostdlib -mthumb-interwork -march=armv5te -std=gnu99 -I ../inc -I $(INC_DIR) $(CFLAGS)
+LD := arm-none-linux-gnueabi-ld
+OC := arm-none-linux-gnueabi-objcopy
+OD := arm-none-linux-gnueabi-objdump
+RM := /bin/rm -rf
+CAT := /bin/cat
+CP := cp
+MV := mv
+
+LIBMATH := $(shell which $(LD) | xargs dirname)/../lib/gcc/arm-none-linux-gnueabi/4.5.2/libgcc.a
+
+
+#izhikevich: $$(APP_OBJECTS) model_izhikevich.o app_frame.lnk
+izhikevich: $(APP_OBJECTS) $(FLAT_OBJECTS) model_izhikevich.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_izhikevich.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_izhikevich.elf
+	$(OC) -O binary -j APLX    app_frame_izhikevich.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_izhikevich.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_izhikevich.elf RW_DATA.bin
+	$(OD) -dt app_frame_izhikevich.elf > app_frame_izhikevich.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_izhikevich.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_izhikevich.aplx ../../../binaries
+	${MV} app_frame_izhikevich.aplx app_frame_izhikevich.elf ../bin
+
+#izhikevich_stdp: $$(APP_OBJECTS) model_izhikevich.o app_frame.lnk
+izhikevich_stdp: $(APP_OBJECTS) $(STDP_OBJECTS) model_izhikevich_stdp.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(STDP_OBJECTS) model_izhikevich_stdp.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_izhikevich_stdp.elf
+	$(OC) -O binary -j APLX    app_frame_izhikevich_stdp.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_izhikevich_stdp.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_izhikevich_stdp.elf RW_DATA.bin
+	$(OD) -dt app_frame_izhikevich_stdp.elf > app_frame_izhikevich_stdp.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_izhikevich_stdp.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_izhikevich_stdp.aplx ../../../binaries
+	${MV} app_frame_izhikevich_stdp.aplx app_frame_izhikevich_stdp.elf ../bin
+
+#izhikevich_stdp_sp: $$(APP_OBJECTS) model_izhikevich.o app_frame.lnk
+izhikevich_stdp_sp: $(APP_OBJECTS) $(STDP_SP_OBJECTS) model_izhikevich_stdp_sp.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(STDP_SP_OBJECTS) model_izhikevich_stdp_sp.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_izhikevich_stdp_sp.elf
+	$(OC) -O binary -j APLX    app_frame_izhikevich_stdp_sp.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_izhikevich_stdp_sp.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_izhikevich_stdp_sp.elf RW_DATA.bin
+	$(OD) -dt app_frame_izhikevich_stdp_sp.elf > app_frame_izhikevich_stdp_sp.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_izhikevich_stdp_sp.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_izhikevich_stdp_sp.aplx ../../../binaries
+	${MV} app_frame_izhikevich_stdp_sp.aplx app_frame_izhikevich_stdp_sp.elf ../bin
+
+#izhikevich_stdp_tts: $$(APP_OBJECTS) model_izhikevich.o app_frame.lnk
+izhikevich_stdp_tts: $(APP_OBJECTS) $(STDP_TTS_OBJECTS) model_izhikevich_stdp_tts.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(STDP_TTS_OBJECTS) model_izhikevich_stdp_tts.o $(LIBMATH)
+#/opt/arm-none-linux-gnueabi/lib/gcc/arm-none-linux-gnueabi/4.5.2/libgcc.a
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_izhikevich_tts.elf
+	$(OC) -O binary -j APLX    app_frame_izhikevich_tts.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_izhikevich_tts.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_izhikevich_tts.elf RW_DATA.bin
+	$(OD) -dt app_frame_izhikevich_tts.elf > app_frame_izhikevich_tts.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_izhikevich_tts.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_izhikevich_tts.aplx ../../../binaries
+	${MV} app_frame_izhikevich_tts.aplx app_frame_izhikevich_tts.elf ../bin
+
+#lif: $$(APP_OBJECTS) model_lif.o app_frame.lnk
+lif: $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_lif.elf
+	$(OC) -O binary -j APLX    app_frame_lif.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_lif.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_lif.elf RW_DATA.bin
+	$(OD) -dt app_frame_lif.elf > app_frame_lif.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_lif.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_lif.aplx ../../../binaries
+	${MV} app_frame_lif.aplx app_frame_lif.elf ../bin
+
+#lif_stdp: $$(APP_OBJECTS) model_lif.o app_frame.lnk
+lif_stdp: $(APP_OBJECTS) $(STDP_OBJECTS) model_lif_stdp.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(STDP_OBJECTS) model_lif_stdp.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_lif_stdp.elf
+	$(OC) -O binary -j APLX    app_frame_lif_stdp.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_lif_stdp.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_lif_stdp.elf RW_DATA.bin
+	$(OD) -dt app_frame_lif_stdp.elf > app_frame_lif_stdp.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_lif_stdp.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_lif_stdp.aplx ../../../binaries
+	${MV} app_frame_lif_stdp.aplx app_frame_lif_stdp.elf ../bin
+
+#lif_stdp_sp: $$(APP_OBJECTS) model_lif.o app_frame.lnk
+lif_stdp_sp: $(APP_OBJECTS) $(STDP_SP_OBJECTS) model_lif_stdp_sp.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(STDP_SP_OBJECTS) model_lif_stdp_sp.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_lif_stdp_sp.elf
+	$(OC) -O binary -j APLX    app_frame_lif_stdp_sp.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_lif_stdp_sp.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_lif_stdp_sp.elf RW_DATA.bin
+	$(OD) -dt app_frame_lif_stdp_sp.elf > app_frame_lif_stdp_sp.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_lif_stdp_sp.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_lif_stdp_sp.aplx ../../../binaries
+	${MV} app_frame_lif_stdp_sp.aplx app_frame_lif_stdp_sp.elf ../bin
+
+#lif_cond: $$(APP_OBJECTS) model_lif_cond.o app_frame.lnk
+lif_cond: $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif_cond.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif_cond.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_lif_cond.elf
+	$(OC) -O binary -j APLX    app_frame_lif_cond.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_lif_cond.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_lif_cond.elf RW_DATA.bin
+	$(OD) -dt app_frame_lif_cond.elf > app_frame_lif_cond.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_lif_cond.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_lif_cond.aplx ../../../binaries
+	${MV} app_frame_lif_cond.aplx app_frame_lif_cond.elf ../bin
+
+#lif_cond_stdp: $$(APP_OBJECTS) model_lif_cond.o app_frame.lnk
+lif_cond_stdp: $(APP_OBJECTS) $(STDP_OBJECTS) model_lif_cond_stdp.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(STDP_OBJECTS) model_lif_cond_stdp.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_lif_cond_stdp.elf
+	$(OC) -O binary -j APLX    app_frame_lif_cond_stdp.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_lif_cond_stdp.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_lif_cond_stdp.elf RW_DATA.bin
+	$(OD) -dt app_frame_lif_cond_stdp.elf > app_frame_lif_cond_stdp.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_lif_cond_stdp.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_lif_cond_stdp.aplx ../../../binaries
+	${MV} app_frame_lif_cond_stdp.aplx app_frame_lif_cond_stdp.elf ../bin
+
+#lif_cond_stdp_sp: $$(APP_OBJECTS) model_lif_cond.o app_frame.lnk
+lif_cond_stdp_sp: $(APP_OBJECTS) $(STDP_SP_OBJECTS) model_lif_cond_stdp_sp.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(STDP_SP_OBJECTS) model_lif_cond_stdp_sp.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_lif_cond_stdp_sp.elf
+	$(OC) -O binary -j APLX    app_frame_lif_cond_stdp_sp.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_lif_cond_stdp_sp.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_lif_cond_stdp_sp.elf RW_DATA.bin
+	$(OD) -dt app_frame_lif_cond_stdp_sp.elf > app_frame_lif_cond_stdp_sp.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_lif_cond_stdp_sp.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_lif_cond_stdp_sp.aplx ../../../binaries
+	${MV} app_frame_lif_cond_stdp_sp.aplx app_frame_lif_cond_stdp_sp.elf ../bin
+
+comms.o: ../src/comms.c ../inc/comms.h ../inc/dma.h
+	$(CC) $(FLAGS) ../src/comms.c
+
+
+config.o: ../src/config.c ../inc/config.h ../inc/dma.h ../inc/model_general.h
+	$(CC) $(FLAGS) ../src/config.c
+
+
+dma.o: ../src/dma.c ../inc/comms.h ../inc/dma.h ../inc/model_general.h
+	$(CC) $(FLAGS) ../src/dma.c
+
+
+dma_stdp.o: ../src/dma.c ../inc/comms.h ../inc/dma.h ../inc/model_general.h ../inc/stdp.h
+	$(CC) $(FLAGS) -o dma_stdp.o ../src/dma.c
+
+
+dma_stdp_sp.o: ../src/dma.c ../inc/comms.h ../inc/dma.h ../inc/model_general.h ../inc/stdp_sp.h
+	$(CC) $(FLAGS) -o dma_stdp_sp.o ../src/dma.c
+
+
+dma_stdp_tts.o: ../src/dma.c ../inc/comms.h ../inc/dma.h ../inc/model_general.h ../inc/stdp_tts.h
+	$(CC) $(FLAGS) -o dma_stdp_tts.o ../src/dma.c
+
+
+main.o: ../src/main.c  ../inc/comms.h ../inc/config.h  ../inc/dma.h ../inc/model_general.h
+	$(CC) $(FLAGS) ../src/main.c
+
+
+main_stdp.o: ../src/main.c  ../inc/comms.h ../inc/config.h  ../inc/dma.h ../inc/model_general.h
+	$(CC) $(FLAGS) -o main_stdp.o ../src/main.c
+
+
+main_stdp_sp.o: ../src/main.c  ../inc/comms.h ../inc/config.h  ../inc/dma.h ../inc/model_general.h
+	$(CC) $(FLAGS) -o main_stdp_sp.o ../src/main.c
+
+
+main_stdp_tts.o: ../src/main.c  ../inc/comms.h ../inc/config.h  ../inc/dma.h ../inc/model_general.h
+	$(CC) $(FLAGS) -o main_stdp_tts.o ../src/main.c
+
+
+model_izhikevich.o: ../src/model_izhikevich.c ../inc/dma.h ../inc/model_general.h ../inc/model_izhikevich.h ../inc/recording.h
+	$(CC) $(FLAGS) ../src/model_izhikevich.c
+
+
+model_izhikevich_stdp.o: ../src/model_izhikevich.c ../inc/dma.h ../inc/model_general.h ../inc/model_izhikevich.h ../inc/recording.h ../inc/stdp.h
+	$(CC) $(FLAGS) -o model_izhikevich_stdp.o ../src/model_izhikevich.c
+
+
+model_izhikevich_stdp_sp.o: ../src/model_izhikevich.c ../inc/dma.h ../inc/model_general.h ../inc/model_izhikevich.h ../inc/recording.h ../inc/stdp_sp.h
+	$(CC) $(FLAGS) -o model_izhikevich_stdp_sp.o ../src/model_izhikevich.c
+
+
+model_izhikevich_stdp_tts.o: ../src/model_izhikevich.c ../inc/dma.h ../inc/model_general.h ../inc/model_izhikevich.h ../inc/recording.h ../inc/stdp_tts.h
+	$(CC) $(FLAGS) -o model_izhikevich_stdp_tts.o ../src/model_izhikevich.c
+
+
+model_lif.o: ../src/model_lif.c ../inc/model_general.h ../inc/recording.h
+	$(CC) $(FLAGS) ../src/model_lif.c
+
+
+model_lif_stdp.o: ../src/model_lif.c ../inc/dma.h ../inc/model_general.h ../inc/model_lif.h  ../inc/recording.h ../inc/stdp.h
+	$(CC) $(FLAGS) -o model_lif_stdp.o ../src/model_lif.c
+
+
+model_lif_stdp_sp.o: ../src/model_lif.c ../inc/dma.h ../inc/model_general.h ../inc/model_lif.h  ../inc/recording.h ../inc/stdp_sp.h
+	$(CC) $(FLAGS) -o model_lif_stdp_sp.o ../src/model_lif.c
+
+
+model_lif_cond.o: ../src/model_lif_cond.c ../inc/model_general.h ../inc/recording.h
+	$(CC) $(FLAGS) ../src/model_lif_cond.c
+
+
+model_lif_cond_stdp.o: ../src/model_lif_cond.c ../inc/dma.h ../inc/model_general.h ../inc/model_lif_cond.h  ../inc/recording.h ../inc/stdp.h
+	$(CC) $(FLAGS) -o model_lif_cond_stdp.o ../src/model_lif_cond.c
+
+
+model_lif_cond_stdp_sp.o: ../src/model_lif_cond.c ../inc/dma.h ../inc/model_general.h ../inc/model_lif_cond.h  ../inc/recording.h ../inc/stdp_sp.h
+	$(CC) $(FLAGS) -o model_lif_cond_stdp_sp.o ../src/model_lif_cond.c
+
+
+recording.o: ../src/recording.c ../inc/recording.h
+	$(CC) $(FLAGS) ../src/recording.c
+
+
+stdp.o: ../src/stdp.c ../inc/stdp.h ../inc/stdp_generic.h
+	$(CC) $(FLAGS) ../src/stdp.c
+
+
+stdp_sp.o: ../src/stdp_sp.c ../inc/stdp_sp.h ../inc/stdp_generic.h
+	$(CC) $(FLAGS) ../src/stdp_sp.c
+
+
+stdp_tts.o: ../src/stdp_tts.c ../inc/stdp_tts.h ../inc/stdp_generic.h
+	$(CC) $(FLAGS) ../src/stdp_tts.c
+
+
+stdp_generic.o:  ../src/stdp_generic.c ../inc/stdp_generic.h
+	$(CC) $(FLAGS) ../src/stdp_generic.c
+
+
+clean:
+	$(RM) *.o  *.txt ../bin/* *~
+	$(RM) ../doc/*.html ../doc/*.css ../doc/bin ../doc/build ../doc/inc ../doc/src

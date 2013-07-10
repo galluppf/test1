@@ -1,0 +1,34 @@
+LIB_DIR = ../../spin1_api/src
+INC_DIR = ../../spin1_api/src
+
+CC := arm-none-linux-gnueabi-gcc -c -O1 -nostdlib -mthumb-interwork -march=armv5te -std=gnu99 -I ../inc -I $(INC_DIR) $(CFLAGS)
+LD := arm-none-linux-gnueabi-ld
+OC := arm-none-linux-gnueabi-objcopy
+OD := arm-none-linux-gnueabi-objdump
+RM := /bin/rm -rf
+CAT := /bin/cat
+CP := cp
+MV := mv
+
+
+APP_OBJECTS = main.o
+
+
+app_dump: $(APP_OBJECTS) app_dump.lnk
+	$(LD) -T app_dump.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS)
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_dump.elf
+	$(OC) -O binary -j APLX    app_dump.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_dump.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_dump.elf RW_DATA.bin
+	$(OD) -dt app_dump.elf > app_dump.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_dump.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_dump.aplx ../../../binaries/app_monitoring.aplx
+	${MV} app_dump.aplx app_dump.elf ../bin
+
+main.o: ../src/main.c
+	$(CC) ../src/main.c
+
+clean:
+	$(RM) *.o  *.txt ../bin/* *~
+	$(RM) ../doc/*.html ../doc/*.css ../doc/bin ../doc/build ../doc/inc ../doc/src

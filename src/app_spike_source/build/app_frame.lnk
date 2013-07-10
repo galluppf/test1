@@ -1,0 +1,55 @@
+
+/*
+// example.lnk	    GNU linker script for "spin1_api" applications
+//
+// Copyright (C)    The University of Manchester - 2011
+//
+// Author           Steve Temple, APT Group, School of Computer Science
+//
+// Email            temples@cs.man.ac.uk
+//
+*/
+
+
+SECTIONS
+{
+    ITCM_BASE = 0x00000000;
+    DTCM_BASE = 0x00400000;
+
+    . = ITCM_BASE;
+
+    OVERLAY 0 : AT (0)
+    {
+    	APLX { * (sark_aplx); }
+
+    	RO_DATA
+    	{
+	      * (RO_DATA)
+              * (.text);
+              * (.rodata*);
+    	}
+    }
+
+    . = DTCM_BASE;
+
+    RW_DATA : { * (.data); }
+
+    . = ALIGN (4);
+
+    ZI_DATA : { * (.bss); * (COMMON); }
+
+    . = ALIGN (4);
+
+    HEAP_BASE = .;
+
+    RO_TO = ITCM_BASE;
+    RO_FROM = SIZEOF (APLX);
+    RO_LENGTH = SIZEOF (RO_DATA);
+
+    RW_TO = DTCM_BASE;
+    RW_FROM = SIZEOF (APLX) + SIZEOF (RO_DATA) - 16;
+    RW_LENGTH = SIZEOF (RW_DATA);
+
+    ZI_TO = RW_TO + SIZEOF (RW_DATA);
+    ZI_LENGTH = SIZEOF (ZI_DATA);
+}

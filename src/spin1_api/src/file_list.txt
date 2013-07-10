@@ -1,0 +1,17 @@
+/* --------------------------------- */
+/* SpiNNaker API, I/O and SARK files */
+/* --------------------------------- */
+
+arm.make	     - Makefile for ARM tools
+gnu.make	     - Makefile for GNU tools
+sark.c               - SpiNNaker application run-time kernel
+sark.lnk	     - GNU linker script
+sark_init.s          - SARK start-up code (in ARM assembly language)
+spin1_api.c          - API functions C-code implementation
+spin1_api.h          - API constants/types/variables and function prototypes
+spin1_api_params.h   - API internal parameters/constants/types
+spin1_isr.c	     - API interrupt handlers
+spinn_io.c           - SpiNNaker I/O library
+spinn_io.h           - SpiNNaker I/O library header file
+spinn_sdp.h          - SpiNNaker Datagram Protocol (SDP) definitions
+spinnaker.h          - SpiNNaker hardware definitions

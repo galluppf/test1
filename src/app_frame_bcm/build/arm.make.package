@@ -1,0 +1,227 @@
+.SECONDEXPANSION:
+
+LIB_DIR = ../../spin1_api/src
+INC_DIR = ../../spin1_api/src
+
+APP_OBJECTS = config.o comms.o recording.o
+
+FLAT_OBJECTS = dma.o main.o
+
+STDP_OBJECTS = dma_stdp.o stdp.o stdp_generic.o main_stdp.o
+
+STDP_SP_OBJECTS = dma_stdp_sp.o stdp_sp.o stdp_generic.o main_stdp_sp.o
+
+STDP_TTS_OBJECTS = dma_stdp_tts.o stdp_tts.o stdp_generic.o main_stdp_tts.o
+
+izhikevich_stdp : FLAGS = -DSTDP
+#izhikevich_stdp : APP_OBJECTS += stdp_generic.o stdp.o
+
+izhikevich_stdp_sp : FLAGS = -DSTDP_SP
+#izhikevich_stdp_sp : APP_OBJECTS += stdp_generic.o stdp_sp.o
+
+izhikevich_stdp_tts : FLAGS = -DSTDP_TTS
+#izhikevich_stdp_tts : APP_OBJECTS += stdp_generic.o stdp_tts.o
+
+lif_stdp : FLAGS = -DSTDP
+#lif_stdp : APP_OBJECTS += stdp_generic.o stdp.o
+
+lif_stdp_sp : FLAGS = -DSTDP_SP
+#lif_stdp_sp : APP_OBJECTS += stdp_generic.o stdp_sp.o
+
+lif_cond_stdp : FLAGS = -DSTDP
+#lif_cond_stdp : APP_OBJECTS += stdp_generic.o stdp.o
+
+lif_cond_stdp_sp : FLAGS = -DSTDP_SP
+#lif_cond_stdp_sp : APP_OBJECTS += stdp_generic.o stdp_sp.o
+
+
+CC = armcc -c --c99 --apcs /interwork --cpu=ARM968E-S $(FLAGS) -I $(INC_DIR) -I ../inc
+AS = armasm --apcs /interwork --keep --cpu=ARM968E-S -I ../inc
+LN = armlink --scatter=app_frame.sct
+
+
+#izhikevich: $$(APP_OBJECTS) model_izhikevich.o
+izhikevich: $(APP_OBJECTS) $(FLAT_OBJECTS) model_izhikevich.o
+	$(LN) --output app_frame_izhikevich.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_izhikevich.o
+	fromelf --bin app_frame_izhikevich.elf -o app_frame_izhikevich.aplx
+	fromelf -cds app_frame_izhikevich.elf -o app_frame_izhikevich.txt
+	cp app_frame_izhikevich.aplx ../../../binaries
+	mv app_frame_izhikevich.aplx app_frame_izhikevich.elf ../bin
+
+#izhikevich_stdp: $$(APP_OBJECTS) model_izhikevich.o
+izhikevich_stdp: $$(APP_OBJECTS) $(STDP_OBJECTS) model_izhikevich_stdp.o
+	$(LN) --output app_frame_izhikevich_stdp.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) $(STDP_OBJECTS) model_izhikevich_stdp.o
+	fromelf --bin app_frame_izhikevich_stdp.elf -o app_frame_izhikevich_stdp.aplx
+	fromelf -cds app_frame_izhikevich_stdp.elf -o app_frame_izhikevich_stdp.txt
+	cp app_frame_izhikevich_stdp.aplx ../../../binaries
+	mv app_frame_izhikevich_stdp.aplx app_frame_izhikevich_stdp.elf ../bin
+
+#izhikevich_stdp_sp: $$(APP_OBJECTS) $(LEARNING_OBJECTS) model_izhikevich.o
+izhikevich_stdp_sp: $$(APP_OBJECTS) $(STDP_SP_OBJECTS) model_izhikevich_stdp_sp.o
+	$(LN) --output app_frame_izhikevich_stdp_sp.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) $(STDP_SP_OBJECTS) model_izhikevich_stdp_sp.o
+	fromelf --bin app_frame_izhikevich_stdp_sp.elf -o app_frame_izhikevich_stdp_sp.aplx
+	fromelf -cds app_frame_izhikevich_stdp_sp.elf -o app_frame_izhikevich_stdp_sp.txt
+	cp app_frame_izhikevich_stdp_sp.aplx ../../../binaries
+	mv app_frame_izhikevich_stdp_sp.aplx app_frame_izhikevich_stdp_sp.elf ../bin
+
+#izhikevich_stdp_tts: $$(APP_OBJECTS) $(LEARNING_OBJECTS) model_izhikevich.o
+izhikevich_stdp_tts: $$(APP_OBJECTS) $(STDP_TTS_OBJECTS) model_izhikevich_stdp_tts.o
+	$(LN) --output app_frame_izhikevich_tts.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) $(STDP_TTS_OBJECTS) model_izhikevich_stdp_tts.o
+	fromelf --bin app_frame_izhikevich_tts.elf -o app_frame_izhikevich_tts.aplx
+	fromelf -cds app_frame_izhikevich_tts.elf -o app_frame_izhikevich_tts.txt
+	cp app_frame_izhikevich_tts.aplx ../../../binaries
+	mv app_frame_izhikevich_tts.aplx app_frame_izhikevich_tts.elf ../bin
+
+#lif: $$(APP_OBJECTS) model_lif.o
+lif: $$(APP_OBJECTS) $(FLAT_OBJECTS) model_lif.o
+	$(LN) --output app_frame_lif.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif.o
+	fromelf --bin app_frame_lif.elf -o app_frame_lif.aplx
+	fromelf -cds app_frame_lif.elf -o app_frame_lif.txt
+	cp app_frame_lif.aplx ../../../binaries
+	mv app_frame_lif.aplx app_frame_lif.elf ../bin
+
+#lif_stdp: $$(APP_OBJECTS) model_lif.o
+lif_stdp: $$(APP_OBJECTS) $(STDP_OBJECTS) model_lif_stdp.o
+	$(LN) --output app_frame_lif_stdp.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) $(STDP_OBJECTS) model_lif_stdp.o
+	fromelf --bin app_frame_lif_stdp.elf -o app_frame_lif_stdp.aplx
+	fromelf -cds app_frame_lif_stdp.elf -o app_frame_lif_stdp.txt
+	cp app_frame_lif_stdp.aplx ../../../binaries
+	mv app_frame_lif_stdp.aplx app_frame_lif_stdp.elf ../bin
+
+#lif_stdp_sp: $$(APP_OBJECTS) model_lif.o
+lif_stdp_sp: $$(APP_OBJECTS) $(STDP_SP_OBJECTS) model_lif_stdp_sp.o
+	$(LN) --output app_frame_lif_stdp_sp.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) $(STDP_SP_OBJECTS) model_lif_stdp_sp.o
+	fromelf --bin app_frame_lif_stdp_sp.elf -o app_frame_lif_stdp_sp.aplx
+	fromelf -cds app_frame_lif_stdp_sp.elf -o app_frame_lif_stdp_sp.txt
+	cp app_frame_lif_stdp_sp.aplx ../../../binaries
+	mv app_frame_lif_stdp_sp.aplx app_frame_lif_stdp_sp.elf ../bin
+
+#lif_cond: $$(APP_OBJECTS) model_lif_cond.o
+lif_cond: $$(APP_OBJECTS) $(FLAT_OBJECTS) model_lif_cond.o
+	$(LN) --output app_frame_lif_cond.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif_cond.o
+	fromelf --bin app_frame_lif_cond.elf -o app_frame_lif_cond.aplx
+	fromelf -cds app_frame_lif_cond.elf -o app_frame_lif_cond.txt
+	cp app_frame_lif_cond.aplx ../../../binaries
+	mv app_frame_lif_cond.aplx app_frame_lif_cond.elf ../bin
+
+#lif_cond_stdp: $$(APP_OBJECTS) model_lif_cond.o
+lif_cond_stdp: $$(APP_OBJECTS) $(STDP_OBJECTS) model_lif_cond_stdp.o
+	$(LN) --output app_frame_lif_cond_stdp.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) $(STDP_OBJECTS) model_lif_cond_stdp.o
+	fromelf --bin app_frame_lif_cond_stdp.elf -o app_frame_lif_cond_stdp.aplx
+	fromelf -cds app_frame_lif_cond_stdp.elf -o app_frame_lif_cond_stdp.txt
+	cp app_frame_lif_cond_stdp.aplx ../../../binaries
+	mv app_frame_lif_cond_stdp.aplx app_frame_lif_cond_stdp.elf ../bin
+
+#lif_cond_stdp_sp: $$(APP_OBJECTS) model_lif_cond.o
+lif_cond_stdp_sp: $$(APP_OBJECTS) $(STDP_SP_OBJECTS) model_lif_cond_stdp_sp.o
+	$(LN) --output app_frame_lif_cond_stdp_sp.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) $(STDP_SP_OBJECTS) model_lif_cond_stdp_sp.o
+	fromelf --bin app_frame_lif_cond_stdp_sp.elf -o app_frame_lif_cond_stdp_sp.aplx
+	fromelf -cds app_frame_lif_cond_stdp_sp.elf -o app_frame_lif_cond_stdp_sp.txt
+	cp app_frame_lif_cond_stdp_sp.aplx ../../../binaries
+	mv app_frame_lif_cond_stdp_sp.aplx app_frame_lif_cond_stdp_sp.elf ../bin
+
+
+comms.o: ../src/comms.c ../inc/comms.h ../inc/dma.h
+	$(CC) ../src/comms.c
+
+
+config.o: ../src/config.c ../inc/config.h ../inc/dma.h ../inc/model_general.h
+	$(CC) ../src/config.c
+
+
+dma.o: ../src/dma.c ../inc/comms.h ../inc/dma.h ../inc/model_general.h
+	$(CC) ../src/dma.c
+
+
+main.o: ../src/main.c  ../inc/comms.h ../inc/config.h  ../inc/dma.h ../inc/model_general.h
+	$(CC) ../src/main.c
+
+
+main_stdp.o: ../src/main.c  ../inc/comms.h ../inc/config.h  ../inc/dma.h ../inc/model_general.h
+	$(CC) -o main_stdp.o ../src/main.c
+
+
+main_stdp_sp.o: ../src/main.c  ../inc/comms.h ../inc/config.h  ../inc/dma.h ../inc/model_general.h
+	$(CC) -o main_stdp_sp.o ../src/main.c
+
+
+main_stdp_tts.o: ../src/main.c  ../inc/comms.h ../inc/config.h  ../inc/dma.h ../inc/model_general.h
+	$(CC) -o main_stdp_tts.o ../src/main.c
+
+
+model_izhikevich.o: ../src/model_izhikevich.c ../inc/dma.h ../inc/model_general.h ../inc/model_izhikevich.h ../inc/recording.h
+	$(CC) -o model_izhikevich.o ../src/model_izhikevich.c
+
+
+model_izhikevich_stdp.o: ../src/model_izhikevich.c ../inc/dma.h ../inc/model_general.h ../inc/model_izhikevich.h ../inc/recording.h
+	$(CC) -o model_izhikevich_stdp.o ../src/model_izhikevich.c
+
+
+model_izhikevich_stdp_sp.o: ../src/model_izhikevich.c ../inc/dma.h ../inc/model_general.h ../inc/model_izhikevich.h ../inc/recording.h
+	$(CC) -o model_izhikevich_stdp_sp.o ../src/model_izhikevich.c
+
+
+model_izhikevich_stdp_tts.o: ../src/model_izhikevich.c ../inc/dma.h ../inc/model_general.h ../inc/model_izhikevich.h ../inc/recording.h
+	$(CC) -o model_izhikevich_stdp_tts.o ../src/model_izhikevich.c
+
+
+model_lif.o: ../src/model_lif.c ../inc/dma.h ../inc/model_general.h ../inc/model_lif.h  ../inc/recording.h
+	$(CC) ../src/model_lif.c
+
+
+model_lif_stdp.o: ../src/model_lif.c ../inc/dma.h ../inc/model_general.h ../inc/model_lif.h  ../inc/recording.h
+	$(CC) -o model_lif_stdp.o ../src/model_lif.c
+
+
+model_lif_stdp_sp.o: ../src/model_lif.c ../inc/dma.h ../inc/model_general.h ../inc/model_lif.h  ../inc/recording.h
+	$(CC) -o model_lif_stdp_sp.o ../src/model_lif.c
+
+
+model_lif_cond.o: ../src/model_lif_cond.c ../inc/dma.h ../inc/model_general.h ../inc/model_lif_cond.h  ../inc/recording.h
+	$(CC) ../src/model_lif_cond.c
+
+
+model_lif_cond_stdp.o: ../src/model_lif_cond.c ../inc/dma.h ../inc/model_general.h ../inc/model_lif_cond.h  ../inc/recording.h
+	$(CC) -o model_lif_cond_stdp.o ../src/model_lif_cond.c
+
+
+model_lif_cond_stdp_sp.o: ../src/model_lif_cond.c ../inc/dma.h ../inc/model_general.h ../inc/model_lif_cond.h  ../inc/recording.h
+	$(CC) -o model_lif_cond_stdp_sp.o ../src/model_lif_cond.c
+
+
+recording.o: ../src/recording.c ../inc/recording.h
+	$(CC) ../src/recording.c
+
+
+stdp.o: ../src/stdp.c ../inc/stdp.h ../inc/stdp_generic.h
+	$(CC) ../src/stdp.c
+
+
+stdp_sp.o: ../src/stdp_sp.c ../inc/stdp_sp.h ../inc/stdp_generic.h
+	$(CC) ../src/stdp_sp.c
+
+
+stdp_tts.o: ../src/stdp_tts.c ../inc/stdp_tts.h ../inc/stdp_generic.h
+	$(CC) ../src/stdp_tts.c
+
+
+stdp_generic.o:  ../src/stdp_generic.c ../inc/stdp_generic.h
+	$(CC) ../src/stdp_generic.c
+
+
+dma_stdp.o: ../src/dma.c ../inc/comms.h ../inc/dma.h ../inc/model_general.h ../inc/stdp.h
+	$(CC) -o dma_stdp.o ../src/dma.c
+
+
+dma_stdp_sp.o: ../src/dma.c ../inc/comms.h ../inc/dma.h ../inc/model_general.h ../inc/stdp_sp.h
+	$(CC) -o dma_stdp_sp.o ../src/dma.c
+
+
+dma_stdp_tts.o: ../src/dma.c ../inc/comms.h ../inc/dma.h ../inc/model_general.h ../inc/stdp_tts.h
+	$(CC) -o dma_stdp_tts.o ../src/dma.c
+
+
+clean:
+	rm -rf *.o  *.txt ../bin/*
+	rm -rf ../doc/*.html ../doc/*.css ../doc/bin ../doc/build ../doc/inc ../doc/src
+

@@ -1,0 +1,160 @@
+#!/usr/bin/python
+"""
+SpiNNaker Ethernet Comm Utility
+
+Command line utility to retrieve state variables from the spiNNaker test board
+
+Francesco Galluppi, SpiNNaker Group, December 2010
+"""
+#from pyNN.spiNNaker import *
+from pyNN.spiNNaker.plot_utils import *
+from NeuroTools.signals import *
+from pylab import show, figure
+
+import optparse
+
+default_spinn_chip_address = 'amu13'
+
+parser = optparse.OptionParser()
+
+parser.add_option("-r", "--retrieve",
+                  action="store_true",             # do not store next argument as a value
+                  dest="retrieve",                   
+                  default=False,                     # default value if not provided
+                  help="retrieve raster plot from the chip specified with -x (--xchip) and -y (--ychip)"
+)
+
+parser.add_option("-t", "--time",
+                  action="store",             # do not store next argument as a value
+                  dest="runtime",                   
+                  type="int",
+                  default=0,                     # default value if not provided
+                  help="running time of the simulation (used to calculate log length)"
+)
+
+
+parser.add_option("-a", "--retrieve-all",
+                  action="store_true",             # do not store next argument as a value
+                  dest="retrieve_all",                   
+                  default=False,                     # default value if not provided
+                  help="retrieve raster plot from all the chip in the testboard"
+)
+
+parser.add_option("-x", "--xchip",
+                  action="store",             # do not store next argument as a value
+                  dest="xChip",                   
+                  type="int",
+                  default=0,                     # default value if not provided
+                  help="set the x chip from which data will be retrieved"
+)
+
+parser.add_option("-p", "--processor",
+                  action="store",             # do not store next argument as a value
+                  dest="processor",                   
+                  type="int",
+                  default=1,                     # default value if not provided
+                  help="set the x chip from which data will be retrieved"
+)
+
+
+parser.add_option("-y", "--ychip",
+                  action="store",             # do not store next argument as a value
+                  dest="yChip",                   
+                  type="int",
+                  default=0,                     # default value if not provided
+                  help="set the x chip from which data will be retrieved"
+)
+
+parser.add_option("-n", "--nNeurons",               # options
+                    dest="nNeurons",                # destination variable
+                    action="store",                 # default, will store the next argument in a variable
+                    type="int",                  # default to string, is the destination type
+                    default=0,
+                    help="number of neurons in each core",    # help message to write
+)
+
+parser.add_option("-c", "--chip_address" ,               # options
+                    dest="address",                # destination variable
+                    action="store",                 # default, will store the next argument in a variable
+                    type="string",                  # default to string, is the destination type
+                    default=default_spinn_chip_address,
+                    help="SpiNNaker Chip Address",    # help message to write
+)
+
+
+
+(options, args) = parser.parse_args()
+
+
+
+sdram_map = {}
+#sdram_map['RASTER_PLOT'] = '72040000'
+#sdram_map['RASTER_PLOT'] = pacman_configuration.get('memory_addresses', 'raster_plot')
+#sdram_map['HEX_V'] = '72136400'     # core 1
+#sdram_map['HEX_V'] = '72536400'     # core 2
+#sdram_map['HEX_V'] = '72936400'     # core 3
+#sdram_map['HEX_V'] = '72D36400'     # core 4
+#sdram_map['HEX_V'] = '73136400'     # core 5
+
+sdram_map['HEX_V'] = hex(int('0x%s' % pacman_configuration.get('memory_addresses', 'v_hex'), 16) + (int('0x400000', 16))*(options.processor-1))[2:]
+
+#sdram_map['HEX_V'] = hex(int('0x72136400', 16) + (int('0x400000', 16))*(options.processor-1))[2:]
+
+sdram_map['HEX_I'] = '7309A400'
+
+print options, args
+
+if len(args) < 2:
+    print "Usage: plot_v {options} filename [ neurons_to_plot ]"    
+    quit(0)
+
+filename = args[0]
+neurons_to_plot = args[1:]
+
+
+#print "plot_v filename neuron_to_plot {nNeurons xchip ychip}"
+
+#runTime = 500
+#filename = argv[1]
+#neuron = int(argv[2])
+#print argv
+
+length_v = hex(options.nNeurons*options.runtime*2)[2:]
+#print length_v
+offs = {'v_values':length_v}
+
+print offs
+
+if options.retrieve:
+    print "Retrieving %d neurons from chip %d %d logs and saving them to file" % ( options.nNeurons, options.xChip, options.yChip)
+    staticPrintV("%s" % filename, options.nNeurons, x_chip=options.xChip, y_chip=options.yChip, retrieve=True, offs=offs, spiNNChipAddr=options.address, memory_addr=sdram_map['HEX_V'] )
+    
+    
+#    staticPrintI("%s.i" % filename, options.nNeurons, runTime, 0, 0, retrieve=True, offs={'i_values':length_v}, spiNNChipAddr='amu16' )
+
+
+if options.retrieve_all:
+    print "Retrieving multichip"
+    for xChip in range(2):
+	    for yChip in range(2):
+#	        print "writing %s_%d_%d.spikes" % (filename, xChip, yChip)
+                staticPrintV("%s_%d_%d.v" % (filename, xChip, yChip), options.nNeurons, runTime, xChip, yChip, retrieve=True)
+                staticPrintI("%s_%d_%d.i" % (filename, xChip, yChip), options.nNeurons, runTime, xChip, yChip, retrieve=True)
+
+fig = figure()
+s = fig.add_subplot(1,1,1)
+
+print "reading files........"
+v = load("%s" % filename, 'v')
+print "\nids in this population: ", v.id_list()
+#i = load("%s.i" % filename, 'v')
+
+
+for neuron in neurons_to_plot:
+    print "plotting neuron %d" % eval(neuron)
+    v[eval(neuron)].plot(display=s, kwargs={'label':'v neuron %d' % eval(neuron)})
+#    i[eval(neuron)].plot(display=s, kwargs={'label':'i neuron %d' % eval(neuron)} )
+
+s.legend()
+show()
+

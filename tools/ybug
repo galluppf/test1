@@ -1,0 +1,2693 @@
+#!/usr/bin/perl
+
+##------------------------------------------------------------------------------
+##
+## ybug		    An application for booting SpiNNaker chips
+##
+## Copyright (C)    The University of Manchester - 2009-2012
+##
+## Author           Steve Temple, APT Group, School of Computer Science
+## Email            temples@cs.man.ac.uk
+##
+##------------------------------------------------------------------------------
+
+package main;
+
+my $version = '1.10';
+
+use strict;
+use warnings;
+
+use IO::Socket::INET;
+use Time::HiRes;
+use POSIX;
+
+#use lib '/home/amulinks/spinnaker/tools/perllib';
+#use lib '/home/temples/steve/sdebug/tools';
+
+my $debug = 0;		# Enable verbosity
+my $timeout = 0.25;	# Target timeout (secs)
+my $readline = 1;	# Use readline
+my $sequence = 1;	# Use sequence numbers
+
+my $spin_socket;	# UDP connection socket
+my $spin_target;	# Target host name
+my $spin_ip;		# Host IP address
+
+my $bmp_socket;		# UDP connection socket
+my $bmp_target;		# BMP host name
+my $bmp_ip;		# BMP IP address
+
+my $dest_ip;
+my $dest_socket;
+
+my $cpu = 0;		# CPU number
+my $chip = 0;		# Chip number (x * 256 + y)
+
+my $port = 17893;
+my $tube_port = 17892;
+
+
+#------------------------------------------------------------------------------
+
+# Following auto-generated from "spinnaker.h"
+
+my $CMD_VER = 0;
+my $CMD_RUN = 1;
+my $CMD_READ = 2;
+my $CMD_WRITE = 3;
+my $CMD_APLX = 4;
+my $CMD_AP_MAX = 15;
+
+my $CMD_LINK_PROBE = 16;
+my $CMD_LINK_READ = 17;
+my $CMD_LINK_WRITE = 18;
+my $CMD_xxx_19 = 19;
+
+my $CMD_NNP = 20;
+my $CMD_P2PC = 21;
+my $CMD_PING = 22;
+my $CMD_FFD = 23;
+
+my $CMD_AS = 24;
+my $CMD_LED = 25;
+my $CMD_IPTAG = 26;
+my $CMD_SROM = 27;
+
+my $CMD_TUBE = 64;
+
+my $NN_CMD_SIG0 = 0;
+my $NN_CMD_RTRC = 1;
+my $NN_CMD_LTPC = 2;
+my $NN_CMD_SP_3 = 3;
+my $NN_CMD_SIG1 = 4;
+my $NN_CMD_P2PC = 5;
+my $NN_CMD_FFS = 6;
+my $NN_CMD_SP_7 = 7;
+my $NN_CMD_PING = 8;
+my $NN_CMD_P2PB = 9;
+my $NN_CMD_SDP = 10;
+my $NN_CMD_SP_11 = 11;
+my $NN_CMD_FBS = 12;
+my $NN_CMD_FBD = 13;
+my $NN_CMD_FBE = 14;
+my $NN_CMD_FFE = 15;
+
+my $TYPE_BYTE = 0;
+my $TYPE_HALF = 1;
+my $TYPE_WORD = 2;
+
+my $IPTAG_NEW  = 0;
+my $IPTAG_SET  = 1;
+my $IPTAG_GET  = 2;
+my $IPTAG_CLR  = 3;
+my $IPTAG_TTO  = 4;
+
+my %rc = (
+    0x80 => 'RC_OK',
+    0x81 => 'RC_LEN',
+    0x82 => 'RC_SUM',
+    0x83 => 'RC_CMD',
+    0x84 => 'RC_ARG',
+    0x85 => 'RC_PORT',
+    0x86 => 'RC_TIMEOUT',
+    0x87 => 'RC_ROUTE',
+    0x88 => 'RC_CPU',
+    0x89 => 'RC_DEAD',
+    0x8a => 'RC_BUF',
+    0x8b => 'RC_P2P_NOREPLY',
+    0x8c => 'RC_P2P_REJECT',
+    0x8d => 'RC_P2P_BUSY',
+    0x8e => 'RC_P2P_TIMEOUT',
+    0x8f => 'RC_PKT_TX',
+);
+
+
+#------------------------------------------------------------------------------
+
+# Boot stuff for Cam/Tom/BootROM
+
+my $BLOCK_SIZE = 256;	# 256 words, 1024 bytes
+my $MAX_BLOCKS = 32;	# 32k limit in DTCM
+
+my $PROT_VER = 1;
+my $BOOT_PORT = 54321;
+my $DELAY = 0.01;
+
+
+sub boot_pkt
+{
+    my ($socket, $op, $a1, $a2, $a3, $data) = @_;
+
+    my $hdr = pack 'n N N N N', $PROT_VER, $op, $a1, $a2, $a3;
+
+    if ($data)
+    {
+	my @data = unpack 'V*', $data;
+	$data = pack 'N*', @data;
+    }
+
+    my $rc = send ($socket, $hdr . $data, 0);
+
+    select (undef, undef, undef, $DELAY);
+}
+
+
+sub cmd_boot
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $file = $cli->{arg_v}->[0];
+
+    return "bad args" unless $ac == 1;
+
+    my $socket = new IO::Socket::INET (PeerAddr => "$spin_target:$BOOT_PORT",
+				       Proto => 'udp');
+
+    return "Can't connect to \"$spin_target:$BOOT_PORT\" ($!)" unless $socket;
+
+    open my $fh, '<', $file or return "Can't open \"$file\"";
+
+    my $filesize = -s $file;
+
+    my $blocks = int ($filesize / ($BLOCK_SIZE * 4));
+    $blocks++ if $filesize % ($BLOCK_SIZE * 4) != 0;
+
+    print "$filesize bytes, $blocks blocks\n";
+
+    if ($blocks > $MAX_BLOCKS)
+    {
+	close $fh;
+	return "File too big" 
+    }
+
+    boot_pkt ($socket, 1, 0, 0, $blocks - 1, '');
+
+    for (my $block = 1; $block <= $blocks; $block++)
+    {
+	my $data;
+	my $n = sysread ($fh, $data, $BLOCK_SIZE * 4);
+	die if $n <= 0;
+
+#	my $a1 = ((int ($n / 4) - 1) << 8) | (($block-1) & 255); !! BootROM bug
+	my $a1 = (($BLOCK_SIZE - 1) << 8) | (($block - 1) & 255);
+
+	boot_pkt ($socket, 3, $a1, 0, 0, $data);
+    }
+
+    boot_pkt ($socket, 5, 1, 0, 0, '');
+
+    close $fh;
+    close $socket;
+
+    return '';
+}
+
+
+#------------------------------------------------------------------------------
+
+# Print data in a variety of hex formats
+
+sub hex_dump
+{
+    my ($addr, $data, $format, $size) = @_;
+
+    my $ptr = 0;
+    my $text = '';
+    $format = lc $format;
+
+    while (1)
+    {
+	my $chunk = substr $data, $ptr, $size;
+	my $len = length $chunk;
+	last if $len == 0;
+
+	$text .= sprintf "%08x ", $addr + $ptr;
+
+	if ($format eq 'byte')
+	{
+	    my @d = unpack 'C*', $chunk;
+	    $text .= sprintf " %02x", $_ for @d;
+	    $text .= '   ' x ($size - 1 - $#d);
+	    $text .= '  ';
+	    $text .= ($_ < 32 || $_ > 127) ? '.' : chr $_ for @d;
+	}
+	elsif ($format eq 'half')
+	{
+	    my @d = unpack 'v*', $chunk;
+	    $text .= sprintf " %04x", $_ for @d;
+	}
+	elsif ($format eq 'word')
+	{
+	    my @d = unpack 'V*', $chunk;
+	    $text .= sprintf " %08x", $_ for @d;
+	}
+
+	$text .= "\n";
+	$ptr += $len;
+    }
+
+    return $text;
+}
+
+#------------------------------------------------------------------------------
+
+sub send_sdp
+{
+    my ($da, $dp, $data) = @_;
+    my ($flags, $tag, $sa, $sp, $cf) = (0x07, 255, 0, 255, 0);
+
+    if ($debug)
+    {
+	print "#-------\n";
+	printf "Sent: F=%02x T=$tag DA=$da DP=$dp SA=$sa SP=$sp CF=$cf\n",
+	$flags;
+    }
+
+    my $hdr = pack 'C2 C4 v2', 0, 0, $flags, $tag, $dp, $sp, $da, $sa;
+
+    my $rc = send ($dest_socket, $hdr . $data, 0);
+
+    warn "!! send failed\n" unless defined $rc;
+}
+
+
+#------------------------------------------------------------------------------
+
+# Send a command to a Spinnaker target using SDP over UDP
+
+my $seq = 0;
+
+sub send_cmd
+{
+    my ($da, $dp, $cmd, $arg1, $arg2, $arg3, $data) = @_;
+    my ($flags, $tag, $sa, $sp, $rdata) = (0x87, 255, 0, 255, '');
+
+    if ($debug)
+    {
+	printf "#> F=%02x T=%02x  DA=%04x DP=%02x ", $flags, $tag, $da, $dp;
+	printf " SA=%04x SP=%02x  SEQ=%d CMD=$cmd\n", $sa, $sp, $seq;
+	printf "#> Arg1=%08x Arg2=%08x Arg3=%08x\n", $arg1, $arg2, $arg3
+	    if $debug > 1;
+	print hex_dump (0, $data, 'byte', 16) if $debug > 2;
+    }
+
+    my $hdr = pack 'v C4 v2 v2 V3', 0, $flags, $tag, $dp, $sp, $da, $sa,
+    $cmd, $seq, $arg1, $arg2, $arg3;
+
+    my $sq = $seq;
+    $seq = ($seq + 1) & 0xffff if $sequence;
+
+    my $tries = 0;
+    my $send = 1;
+    my $rc;
+
+    while ($tries != 3)
+    {
+	if ($send)
+	{
+	    printf "# Retry $tries\n" if $tries;
+	    $tries++;
+	    my $rc = send ($dest_socket, $hdr . $data, 0);
+	    die "send failed\n" unless defined $rc;
+	}
+
+	my $rd_mask = '';
+	vec ($rd_mask, fileno ($dest_socket), 1) = 1;
+
+	my $n = select ($rd_mask, undef, undef, $timeout);
+
+	if ($n == 0)
+	{
+	    print "# Timeout\n";
+	    $send = 1;
+	    next;
+	}
+
+	my $addr = recv ($dest_socket, $rdata, 65536, O_NONBLOCK);
+	return (0, 'Target recv error') unless defined $addr;
+
+	my $rq;
+	(undef, $flags, $tag, $dp, $sp, $da, $sa, $rc, $rq, $rdata) =
+	    unpack 'v C4 v2 v2 a*', $rdata;
+
+	if ($debug)
+	{
+	    my $len = length $rdata;
+	    printf "#< F=%02x T=%02x  DA=%04x DP=%02x ", $flags, $tag, $da, $dp;
+	    printf " SA=%04x SP=%02x  SEQ=$rq RC=$rc (%d)\n", $sa, $sp, $len;
+	    print hex_dump (0, $rdata, 'byte', 16) if $debug > 2;
+	    print "#-------\n";
+	}
+
+	last if $rq == $sq;
+	$send = 0;
+	print "# Seq error - sent $sq, got $rq\n";
+    }
+
+    return (0, "Failed!\n") if $tries == 3;
+
+    if ($debug)
+    {
+##	my $len = length $data;
+##	printf "#\n#< F=%02x T=%02x  DA=%04x DP=%02x ", $flags, $tag, $da, $dp;
+##	printf " SA=%04x SP=%02x  SEQ=$rq RC=$rc (%d)\n", $sa, $sp, $len;
+##	print hex_dump (0, $data, 'byte', 16);
+##	print "#-------\n";
+    }
+
+    if ($rc != 0x80)
+    {
+	$rc = $rc{$rc} if defined $rc{$rc};
+	return (0, $rc);
+    }
+
+    return (1, $rdata);
+}
+
+
+#------------------------------------------------------------------------------
+
+
+sub cmd_sver
+{
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_VER, 0, 0, 0, '');
+    return $data unless $rc;
+
+    my ($v_cpu, $p_cpu, $chip_y, $chip_x, $size, $ver_num, $time, $ver_str) = 
+	unpack 'C4 v2 V! a*', $data;
+    $time = localtime $time;
+    my ($name, $hw) = split /\//, $ver_str;
+    chop $hw; # !! ST 21feb12 remove null from end of string
+    printf "$name %0.2f at $hw:$chip_x,$chip_y,$v_cpu (built $time) \[$p_cpu]\n",
+        $ver_num / 100;
+    
+    return '';
+}
+
+
+sub cmd_sp
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $arg1 = $cli->{arg_v}->[0];
+    my $arg2 = $cli->{arg_v}->[1];
+    my $arg3 = $cli->{arg_v}->[2];
+
+    my $chip_x = $chip >> 8;
+    my $chip_y = $chip & 255;
+
+    return '' if $ac == 0;
+
+    if ($ac == 1 && $arg1 =~ /^\d+$/)
+    {
+	$cpu = $arg1;
+    }
+    elsif ($ac == 1 && $arg1 eq 'root')
+    {
+	$cpu = $chip_x = $chip_y = 0;
+    }
+    elsif ($ac == 2 && $arg1 =~ /^\d+$/ && $arg2 =~ /^\d+$/)
+    {
+	($chip_x, $chip_y, $cpu) = ($arg1, $arg2, 0)
+    }
+    elsif ($ac == 3 && $arg1 =~ /^\d+$/ && $arg2 =~ /^\d+$/ &&
+	   $arg3 =~ /^\d+$/)
+    {
+	($chip_x, $chip_y, $cpu) = ($arg1, $arg2, $arg3)
+    }
+    else
+    {
+	return "bad args";
+    }
+
+    $chip = ($chip_x << 8) + $chip_y;
+
+    $cli->{prompt} =~ s/:.+//;
+    $cli->{prompt} .= ":$chip_x,$chip_y,$cpu > ";
+
+    return '';
+}
+
+
+sub cmd_iptag
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $host = $cli->{arg_v}->[0];
+    my $port = $cli->{arg_n}->[1];
+    my $tag = $cli->{arg_n}->[2];
+
+    $port = $tube_port unless $ac > 1 && defined $port;
+    return "bad tag" if $ac == 3 && $tag > 3;
+
+    $tag = 0 unless $ac == 3;
+
+    my ($rc, $data);
+
+    if ($ac == 0)
+    {
+	($rc, $data) = send_cmd ($chip, $cpu, $CMD_IPTAG,
+				     $IPTAG_TTO << 16, 255, 0, '');
+	return $data unless $rc;
+
+	my ($tto, undef, $pool, $fix) = unpack 'C4', $data;
+	my $max = $pool + $fix;
+	$tto = (1 << ($tto - 1)) / 100 if $tto;
+
+	print "IPTags=$max (F=$fix, T=$pool), TTO=${tto}s\n\n";
+
+	for (my $i = 0; $i < $max; $i++)
+	{
+	    ($rc, $data) = send_cmd ($chip, $cpu, $CMD_IPTAG,
+				     ($IPTAG_GET << 16) + $i, 1, 0, '');
+	    return $data unless $rc;
+
+	    my ($ip, $mac, $port, $timeout, $flags) =
+		unpack 'a4 a6 v v v', $data;
+
+	    if ($flags & 0x8000)
+	    {
+		my @mac = unpack 'C*', $mac;
+		$_ = sprintf "%02x", $_ for @mac;
+		$mac = join ':', @mac;
+
+		$ip = join '.', unpack 'C*', $ip;
+		my $pad = ' ' x (15 - length $ip);
+
+		printf "%2d: $ip$pad  %5d  $mac  T=%-4s  F=%04x\n",
+		$i, $port, $timeout / 100, $flags;
+	    }
+	}
+	return '';
+    }
+
+    if ($ac >= 1 && $host eq '-')
+    {
+	my $tag = ($ac == 2) ? $port : 0;
+	return "bad tag" if $tag < 0 || $tag > 3;
+
+	($rc, $data) = send_cmd ($chip, $cpu, $CMD_IPTAG,
+				 ($IPTAG_CLR << 16) + $tag, 0, 0, '');
+	return ($rc) ? '' : $data;
+    }
+
+    $host = $dest_ip if $host eq ".";
+
+    my $ip = gethostbyname ($host);
+
+    return "unknown host \"$host\"" unless defined $ip;
+
+    ($ip) = unpack 'V', $ip;
+
+    ($rc, $data) = send_cmd ($chip, $cpu, $CMD_IPTAG,
+				 ($IPTAG_SET << 16) + $tag, $port, $ip, '');
+    return ($rc) ? '' : $data;
+}
+
+
+sub cmd_adc
+{
+    my $CMD_ADC = 52;
+    my @adc_n = ("V12d", "V12c", "V12b", "V12a", "V18", "V25", "V33", "VPWR");
+    my @adc_t = (2400, 2400, 2400, 2400, 2400, 3020, 3600, 14400);
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_ADC, 0, 0, 0, '');
+
+    return $data unless $rc;
+    return "Bad data length" unless length $data == 16;
+    my @v = unpack "v8", $data;
+    for (my $i = 0; $i < 8; $i++)
+    {
+	my $v = $v[$i] * 2500 / 4096;
+	$v = $v * $adc_t[$i] / 2400;
+
+	printf "%4s %5.2f\n", $adc_n[$i], $v / 1000;
+    }
+}
+
+
+sub cmd_sdp
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $port = $cli->{arg_n}->[0];
+    my $dv   = $cli->{arg_x}->[1];
+    my $len  = $cli->{arg_n}->[2];
+
+    return "bad args" if $ac != 3;
+
+    my ($rc, $data) = send_sdp ($chip, ($port << 5) + $cpu, (chr ($dv) x $len) . chr (0));
+
+    return ($rc) ? '' : $data;
+}
+
+
+my $nn_id = 0;
+
+sub next_id
+{
+    $nn_id++;
+    $nn_id = 1 if $nn_id > 127;
+
+#    my $r = 2 * $nn_id;
+#    print ">> next_id $r\n";
+
+    return 2 * $nn_id;;
+}
+
+
+sub cmd_as
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $addr = $cli->{arg_x}->[0];
+    my $mask = $cli->{arg_x}->[1];
+
+    return "bad args" if $ac != 2;
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_AS,
+				$addr, $mask, 0, '');
+
+    return ($rc) ? '' : $data;
+}
+
+
+sub sectors
+{
+    my ($addr, $end_addr) = @_;
+    my ($start, $end);
+    my $a = 0;
+
+    my @secs = ((4096) x 16, (32768) x 14);
+
+    for (my $i = 0; $i <= $#secs; $i++)
+    {
+	$a += $secs[$i];
+	$start = $i if ! defined $start && $a > $addr;
+	$end = $i if ! defined $end && $a >= $end_addr;
+    }
+
+    return ($start, $end);
+}
+
+
+my $CMD_FLASH_ERASE = 50;
+my $CMD_FLASH_WRITE = 51;
+
+
+sub cmd_flash_erase
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $from = $cli->{arg_x}->[0];
+    my $to = $cli->{arg_x}->[1];
+
+    return "bad args" if $ac != 2;
+    return "from >= to" if $from >= $to;
+    return "address not in flash" if $from >= 524288;
+    return "address not in flash" if $to >= 524288;
+
+    my ($start, $end) = sectors ($from, $to);
+
+    print "Erase sectors $start to $end\n";
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_FLASH_ERASE,
+				$start, $end, 0, '');
+    return $data unless $rc;
+
+    return '';
+}
+
+
+
+sub cmd_flash_write
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $file = $cli->{arg_v}->[0];
+    my $addr = $cli->{arg_x}->[1];
+    my $boot = $cli->{arg_v}->[2];
+
+    return "bad args" if $ac < 2;
+    return "can't read \"$file\"" unless -r $file;
+ 
+    my $size = -s $file;
+    return "empty file" unless $size != 0;
+
+    return "not on 4k byte boundary" unless ($addr & 4095) == 0;
+    return "crosses flash 4k boundary"
+	if $addr < 65536 && ($addr + $size) > 65536;
+    return "address not in flash" if $addr >= 524288;
+    return "address not in flash" if ($addr + $size) > 524288;
+
+    printf "Program from 0x%08x to 0x%08x\n", $addr, $addr + $size;
+
+    my ($start, $end) = sectors ($addr, $addr + $size);
+
+    print "Erase sectors $start to $end\n";
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_FLASH_ERASE,
+			     $start, $end, 0, '');
+    return $data unless $rc;
+
+    my $fbuf = unpack "V", $data;
+
+    open my $fh, "<", $file or die "!! can't open \"$file\"";
+
+    my $count = 0;
+    my $boot_addr = $addr;
+
+    while (1)
+    {
+	my $c = sysread $fh, my $buf, 256;
+
+	if ($c != 0)
+	{
+	    ($rc, $data) = send_cmd ($chip, $cpu, $CMD_WRITE,
+				     $fbuf + $count, $c, $TYPE_BYTE, $buf);
+	    unless ($rc)
+	    {
+		close $fh;
+		return $data;
+	    }
+	}
+
+	$count += $c;
+
+	if ($count == 4096 || ($count > 0 && $c == 0))
+	{
+	    my ($start, $end) = sectors ($addr, $addr+1);
+	    printf "Write %4d at 0x%08x (sector $start)\n", $count, $addr;
+
+	    ($rc, $data) = send_cmd ($chip, $cpu, $CMD_FLASH_WRITE,
+				     $addr, 4096, $start, '');
+	    unless ($rc)
+	    {
+		close $fh;
+		return $data;
+	    }
+
+	    $count = 0;
+	    $addr += 4096;
+	}
+	
+	last if $c == 0;
+    }
+
+    close $fh;
+
+    return '' unless $boot && $boot eq "boot";
+
+    ($rc, $data) = send_cmd ($chip, $cpu, $CMD_READ, 0, 256, $TYPE_BYTE, '');
+    return $data unless $rc;
+
+    my @w = unpack "V*", $data;
+    $w[6] = $boot_addr;
+
+    use integer;
+
+    my $sum = 0;
+
+    for (my $i = 0; $i < 7; $i++)
+    {
+	$sum += $w[$i];
+    }
+
+    $w[7] = -$sum;
+
+    printf "Checksum 0x%08x\n", $w[7];
+
+    my $wdata = pack "V*", @w;
+
+    print "Erase boot sector\n";
+
+    ($rc, $data) = send_cmd ($chip, $cpu, $CMD_FLASH_ERASE,
+			     0, 0, 0, '');
+    return $data unless $rc;
+
+    my $flash_buf = unpack "V", $data;
+
+    ($rc, $data) = send_cmd ($chip, $cpu, $CMD_WRITE,
+			     $flash_buf, 256, $TYPE_BYTE, $wdata);
+    return $data unless $rc;
+
+    print "Write boot sector\n";
+
+    ($rc, $data) = send_cmd ($chip, $cpu, $CMD_FLASH_WRITE,
+			     0, 256, 0, '');
+    return $data unless $rc;
+
+    return '';
+}
+
+
+sub cmd_ff
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $file = $cli->{arg_v}->[0];
+    my $mask = $cli->{arg_x}->[1];
+
+    return "bad args" if $ac != 2;
+
+    my $addr = 0xf5000000;
+    my ($fwd, $rty) = (0x3e, 0x18);
+    my ($sfwd, $srty) = (0x3f, 0x18);
+
+    flood_fill ($file, $addr, $fwd, $rty, $sfwd, $srty, $mask)
+}
+
+
+# arg1 = S/E/srce_fwd : fwd : retry : ID/B
+# arg2 = srce_rty : blk_cnt : blk_num : word_cnt
+# arg3 = load_addr
+# buf -> load data (mask word follows last data word)
+# flags in arg1 - 31 -> start, 30 -> end, 0 -> block
+
+sub flood_fill
+{
+    my ($file, $addr, $fwd, $rty, $sfwd, $srty, $mask) = @_;
+
+    my $id = next_id ();
+    my $fr = ($sfwd << 8) + $srty;
+
+    open my $dh, '<', $file or return "can't open \"$file\"";
+
+    my $filesize = -s $file;
+    my $blocks = int ($filesize / 256);
+    $blocks++ if $filesize % 256 != 0;
+
+    print "$filesize bytes, $blocks blocks\n";
+
+# FFS packet
+
+    my $key = ($NN_CMD_FFS << 24) + (0 << 16) + ($blocks << 8) + $id; # const
+    my $data = $addr;
+
+#    printf "FFS %08x %08x %08x\n", $key, $data, $fr;
+
+    my ($rc, $msg) = send_cmd (0, 0, $CMD_NNP, $key, $data, $fr, '');
+    return $msg if $rc == 0;
+
+# FF data blocks ($blocks << 24) + ($fwd << 16) + ($rty << 8)
+
+    for (my $block = 0; $block < $blocks; $block++)
+    {
+	my $buf;
+	my $len = sysread $dh, $buf, 256;
+
+	die if $len <= 0;
+
+	my $size = ($len / 4) - 1;
+
+	my $arg1 = ($sfwd << 24) + ($srty << 16) + (0 << 8) + $id;
+	my $arg2 = (0 << 24) + ($block << 16) + ($size << 8) + 0;
+
+#	printf "FFD %08x %08x %08x\n", $arg1, $arg2, $addr;
+
+	($rc, $msg) = send_cmd (0, 0, $CMD_FFD, $arg1, $arg2, $addr, $buf);
+	return $msg if $rc == 0;
+
+#	sleep 1;
+	$addr += $len;
+
+    }
+
+    close $dh;
+
+# arg1 = key
+# arg2 = data
+# arg3 = mark[31] : : fwd : retry
+
+    $key = ($NN_CMD_FFE << 24) + (0 << 16) + (0 << 8) + $id; # const
+    $data = $mask;
+
+#    printf "FFE %08x %08x %08x\n", $key, $data, $fr;
+    ($rc, $msg) = send_cmd (0, 0, $CMD_NNP, $key, $data, $fr, '');
+    return $msg if $rc == 0;
+}
+
+
+sub cmd_nnp
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+
+    my $key = $cli->{arg_x}->[0];
+    my $data = $cli->{arg_x}->[1];
+
+#    my $fr = $cli->{arg_x}->[2];
+
+    my $id = next_id ();
+
+    $key = ($NN_CMD_SIG1 << 24) + (0x04 << 16) + (0x2c << 8) + $id; # const
+    $data = 0;
+
+    my ($fwd, $rty) = (0x3e, 0xf8);
+    my ($sfwd, $srty) = (0x3f, 0xf8);
+    my $fr = ($sfwd << 8) + $srty;
+
+#    return "bad args" if $ac != 3;
+
+# arg1 = 00 : 00 : 00 : ID
+# arg2 = dim_x : dim_y : addr_x, addr_y;
+# arg3 = 0 : 0 : fwd : retry
+
+    my ($rc, $error) = send_cmd ($chip, $cpu, $CMD_NNP, $key, $data, $fr, '');
+    return ($rc) ? '' : $data;
+}
+
+
+my %type = (byte => 0, half => 1, word => 2);
+
+sub cmd_gw
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+
+    return "bad args" if $ac != 3;
+
+    my $type = $cli->{arg_v}->[0];
+    my $addr = $cli->{arg_x}->[1];
+    my $data = $cli->{arg_x}->[2];
+
+    return "bad type" unless $type =~ /^(byte|half|word)$/i;
+
+    $type = $type{$type};
+
+    $addr -= 0xf5007f00;
+
+    my $id = next_id ();
+
+    my $key = ($NN_CMD_SIG1 << 24) + (0 << 20) + ($type << 18) + 
+	(0 << 16) + ($addr << 8) + $id; # const
+
+    my $fr = (0x3f << 8) + 0xf8;
+
+    my ($rc, $error) = send_cmd ($chip, $cpu, $CMD_NNP, $key, $data, $fr, '');
+
+    return ($rc) ? '' : $error;
+}
+
+
+sub cmd_p2pc
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $dim_x = $cli->{arg_n}->[0];
+    my $dim_y = $cli->{arg_n}->[1];
+
+    return "bad args" if $ac != 2;
+
+    my $id = next_id ();
+
+# arg1 = 00 : 00 : 00 : ID
+# arg2 = dim_x : dim_y : addr_x, addr_y;
+# arg3 = 0 : 0 : fwd : retry
+
+    my $arg1 = (0x00 << 24) + (0x3e << 16) + (0x00 << 8) + $id;
+    my $arg2 = ($dim_x << 24) + ($dim_y << 16) + (0x00 << 8) + 0x00;
+    my $arg3 = (0x00 << 24) + (0x00 << 16) + (0x3f << 8) + 0xf8;
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_P2PC,
+				$arg1, $arg2, $arg3, '');
+
+    return ($rc) ? '' : $data;
+}
+
+
+sub cmd_srun
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $addr = $cli->{arg_x}->[0];
+    my $key = lc $cli->{arg_v}->[1];
+    my ($rc, $data);
+
+    return "bad args" if $ac != 2;
+
+    if ($key eq 'now' || $key eq 'all')
+    {
+	($rc, $data) = send_cmd ($chip, $cpu, $CMD_RUN, $addr, 0x0101, 0, '');
+    }
+    elsif ($key eq 'wait')
+    {
+	($rc, $data) = send_cmd ($chip, $cpu, $CMD_RUN, $addr, 0x0100, 0, '');
+    }
+    else
+    {
+	return "bad arg ($key)";
+    }
+
+    return ($rc) ? '' : $data;
+}
+
+
+sub cmd_sload
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $file = $cli->{arg_v}->[0];
+    my $addr = $cli->{arg_x}->[1];
+    my $log = $cli->{arg_v}->[2];
+
+    my $count = 0;
+    my $time = Time::HiRes::time;
+
+    $log = defined $log && $log eq 'log';
+
+    return "bad args" if $ac < 2;
+
+    open my $dh, '<', $file or return "can't open \"$file\"";
+
+    while (1)
+    {
+	my $len = sysread $dh, my $buf, 256;
+
+	last if $len <= 0;
+
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_WRITE,
+				    $addr, $len, $TYPE_BYTE, $buf);
+	unless ($rc)
+	{
+	    close $dh;
+	    return $data;
+	}
+
+	$addr += 256;
+	$count += 256;
+
+	if ($log && ($count % 256000) == 0)
+	{
+	    my $now = Time::HiRes::time;
+	    my $diff = $now - $time;
+	    $time = $now;
+	    printf "%0.2f MB at %0.2f Mbyte/s\n", $count / 1048576, 0.256 / $diff;
+	}
+    }
+
+    close $dh;
+
+    return '';
+}
+
+my $CMD_XILINX = 56;
+
+sub cmd_xilinx
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $file = $cli->{arg_v}->[0];
+    my $log = $cli->{arg_v}->[1];
+
+    my $count = 0;
+    my $time = Time::HiRes::time;
+
+    $log = defined $log && $log eq 'log';
+
+    return "bad args" if $ac < 1;
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_XILINX, 1, 0, 0, '');
+
+    return $data unless $rc;
+
+    open my $dh, '<', $file or return "can't open \"$file\"";
+
+    while (1)
+    {
+	my $len = sysread $dh, my $buf, 256;
+
+	last if $len <= 0;
+
+	($rc, $data) = send_cmd ($chip, $cpu, $CMD_XILINX, 0, $len, 0, $buf);
+
+	unless ($rc)
+	{
+	    close $dh;
+	    return $data;
+	}
+
+	$count += $len;
+
+	if ($log && ($count % 256000) == 0)
+	{
+	    my $now = Time::HiRes::time;
+	    my $diff = $now - $time;
+	    $time = $now;
+	    printf "%0.2f MB at %0.2f Mbyte/s\n", $count / 1048576, 0.256 / $diff;
+	}
+    }
+
+    close $dh;
+    print "Sent $count bytes\n";
+
+    return '';
+}
+
+
+sub cmd_sdump
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $file = $cli->{arg_v}->[0];
+    my $addr = $cli->{arg_x}->[1];
+    my $len = $cli->{arg_x}->[2];
+    my $bytes = 0;
+
+    return "bad args" if $ac != 3;
+
+    open my $dh, '>', $file or return "can't open \"$file\"";
+
+    while ($bytes != $len)
+    {
+	my $l = ($len - $bytes > 256) ? 256 : $len - $bytes;
+	$bytes += $l;
+
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_READ,
+				    $addr, $l, $TYPE_BYTE, '');
+	unless ($rc)
+	{
+	    close $dh;
+	    return $data;
+	}
+
+	$addr += $l;
+
+	my $ld = length ($data);
+	warn"!! expected $l bytes, got $ld\n" if $ld != $l;
+
+	die "syswrite failed!\n" unless syswrite $dh, $data;
+    }
+
+    close $dh;
+
+    return '';
+}
+
+
+sub cmd_lload
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $link = $cli->{arg_n}->[0];
+    my $file = $cli->{arg_v}->[1];
+    my $addr = $cli->{arg_x}->[2];
+
+    return "bad args" if $ac != 3 || $link > 5 || $link < 0;;
+
+    open my $dh, '<', $file or return "can't open \"$file\"";
+
+    while (1)
+    {
+	my $len = sysread $dh, my $buf, 256;
+
+	last if $len <= 0;
+
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_LINK_WRITE,
+				    $addr, $len, $link, $buf);
+	unless ($rc)
+	{
+	    close $dh;
+	    return $data;
+	}
+
+	$addr += 256;
+    }
+
+    close $dh;
+
+    return '';
+}
+
+
+sub cmd_lboot
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $link = $cli->{arg_n}->[0];
+    my $file = $cli->{arg_v}->[1];
+    my $mask = $cli->{arg_x}->[2];
+
+    $mask = 0x3ffff unless defined $mask;
+
+    return "bad args" if $ac < 2 || $link > 5 || $link < 0;
+
+    open my $dh, '<', $file or return "can't open \"$file\"";
+
+    my $addr = 0xf5000000; # System RAM
+    my ($rc, $data);
+
+    ($rc, $data) = send_cmd ($chip, $cpu, $CMD_LINK_WRITE,
+			     0xf2000018, 4, $link,
+			     pack ('V', 0x5ec00000 + $mask));
+    return $data unless $rc;
+
+    ($rc, $data) = send_cmd ($chip, $cpu, $CMD_LINK_WRITE,
+			     0xf2000038, 4, $link, pack ('V', 0x00000001));
+    return $data unless $rc;
+
+    while (1)
+    {
+	my $len = sysread $dh, my $buf, 256;
+
+	last if $len <= 0;
+
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_LINK_WRITE,
+				    $addr, $len, $link, $buf);
+	unless ($rc)
+	{
+	    close $dh;
+	    return $data;
+	}
+
+	$addr += 256;
+    }
+
+    close $dh;
+
+#v1.09 was 0x5ec00002 now 0x5ec00000
+
+    ($rc, $data) = send_cmd ($chip, $cpu, $CMD_LINK_WRITE,
+			     0xf2000018, 4, $link, pack ('V', 0x5ec00000));
+
+    return ($rc) ? '' : $data;
+}
+
+
+sub cmd_lmemw
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $link = $cli->{arg_x}->[0];
+    my $addr = $cli->{arg_x}->[1];
+
+    return "bad args" if $ac != 2 || $link > 5 || $link < 0;
+
+    $addr &= ~3;
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_LINK_READ, $addr, 256, $link, '');
+    return $data unless $rc;
+
+    print hex_dump ($addr, $data, 'word', 32);
+    return '';
+}
+
+
+sub cmd_lmemb
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $link = $cli->{arg_x}->[0];
+    my $addr = $cli->{arg_x}->[1];
+
+    return "bad args" if $ac != 2 || $link > 5 || $link < 0;
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_LINK_READ, $addr, 256, $link, '');
+    return $data unless $rc;
+
+    print hex_dump ($addr, $data, 'byte', 16);
+
+    return '';
+}
+
+
+sub cmd_smemb
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $addr = ($ac >= 1) ? $cli->{arg_x}->[0] : 0;
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_READ, $addr, 256, $TYPE_BYTE, '');
+    return $data unless $rc;
+
+    print hex_dump ($addr, $data, 'byte', 16);
+
+    return '';
+}
+
+my $CMD_SF_READ = 53;
+my $CMD_SF_WRITE = 54;
+
+sub cmd_sf_read
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $addr = $cli->{arg_x}->[0];
+
+    $addr = 0 if $ac < 1;
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_SF_READ,
+				$addr, 256, 0x03, '');
+    return $data unless $rc;
+
+    print hex_dump ($addr, $data, 'byte', 16);
+
+    return '';
+}
+
+
+sub cmd_sf_write
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $file = $cli->{arg_v}->[0];
+    my $addr = $cli->{arg_x}->[1];
+
+    return "bad args" if $ac < 2;
+    return "address not 4k aligned" unless ($addr & 0xfff) == 0;
+
+    open my $dh, '<', $file or return "can't open \"$file\"";
+
+    while (1)
+    {
+	my $len = sysread $dh, my $buf, 256;
+
+	last if $len <= 0;
+
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_SF_WRITE,
+				    $addr, $len, 0x02, $buf);
+
+	unless ($rc)
+	{
+	    close $dh;
+	    print "\n";
+	    return $data;
+	}
+
+	printf "\rByte %d", $addr unless $cli->{quiet};
+	$addr += 256;
+    }
+
+    close $dh;
+
+    print "\n";
+    return 0;
+}
+
+
+sub cmd_srom_read
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $addr = $cli->{arg_x}->[0];
+
+    $addr = 0 if $ac < 1;
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_SROM, 256 * 65536 + 32,
+			 0x03000000 + $addr, 0, '');
+    return $data unless $rc;
+
+    print hex_dump ($addr, $data, 'byte', 16);
+
+    return '';
+}
+
+
+
+sub cmd_srom_erase
+{
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_SROM,
+				0xc8, 0xc7000000, 0, '');
+    return ($rc) ? '' : $data;
+}
+
+
+sub cmd_srom_write
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $file = $cli->{arg_v}->[0];
+    my $addr = $cli->{arg_x}->[1];
+    my $dh;
+
+    return "bad args" if $ac < 2;
+    return "can't open \"$file\"" unless open $dh, '<', $file;
+
+    while (1)
+    {
+	my $len = sysread $dh, my $buf, 256;
+
+	last if $len <= 0;
+
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_SROM,
+				    $len * 65536 + 0x1e0, 
+				    0x02000000 + $addr, 0, $buf);
+	unless ($rc)
+	{
+	    close $dh;
+	    print "\n";
+	    return $data;
+	}
+
+	printf "\rByte %d", $addr unless $cli->{quiet};
+	$addr += 256;
+    }
+
+    close $dh;
+
+    print "\n";
+    return 0;
+}
+
+
+sub check_ip
+{
+    my $s = shift;
+
+    if ($s =~ /^\/(\d+)$/) # Special case /nn -> 255.255....
+    {
+	$s = $1;
+	return () if $s > 32 || $s < 8;
+	$s = (0xffffffff << (32 - $s)) & 0xffffffff;
+	$s = join ".", ($s >> 24) & 255, ($s >> 16) & 255,
+        	($s >> 8) & 255, ($s >> 0) & 255;
+    }
+
+    return () unless $s =~ /^\d+\.\d+\.\d+\.\d+$/;
+
+    my @v = reverse split /\./, $s;
+
+    for my $n (@v)
+    {
+	return () if $n < 0 || $n > 255;
+    }
+    return @v;
+}
+
+
+sub cmd_srom_info
+{
+    my $addr = 8; #const
+    my $len = 32;
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_SROM, $len * 65536 + 32,
+				   0x03000000 + $addr, 0, '');
+    return $data unless $rc;
+
+    my @d = unpack 'C8 C4 C4 C4 N', $data;
+
+    printf "Flag: %04x\n", ($d[2] << 8) + $d[3];
+    printf "MAC:  %02x:%02x:%02x:%02x:%02x:%02x\n",
+      $d[1], $d[0], $d[7], $d[6], $d[5], $d[4];
+    print "IP:   ", join ('.', reverse @d[8..11]), "\n";
+    print "GW:   ", join ('.', reverse @d[12..15]), "\n";
+    print "NM:   ", join ('.', reverse @d[16..19]), "\n";
+    printf "Port: %d\n", $d[20];
+
+    return '';
+}
+
+
+sub cmd_srom_init
+{
+    my $cli = shift;
+
+    return "bad args" unless $cli->{arg_c} == 6;
+
+    my $flag = $cli->{arg_x}->[0];
+    my $mac = $cli->{arg_v}->[1];
+    my @ip = check_ip ($cli->{arg_v}->[2]);
+    my @gw = check_ip ($cli->{arg_v}->[3]);
+    my @nm = check_ip ($cli->{arg_v}->[4]);
+    my $port = $cli->{arg_n}->[5];
+
+    return "bad flag" unless $flag >= 0x8000 && $flag < 0x10000;
+    return "bad MAC" unless $mac =~ /^([0-9a-f]{1,2}:){5}[0-9a-f]{1,2}$/i;
+    return "bad IP" unless $#ip == 3;
+    return "bad GW" unless $#gw == 3;
+    return "bad NM" unless $#nm == 3;
+    return "bad port" unless $port >= 1024 && $port < 65536;
+
+    my @mac = reverse split /:/, $mac;
+    $_ = hex $_ for @mac;
+
+    my $d = pack "N2 C2 n C4 C4 C4 C4 N3 N",
+              0x553a0008, 0xf5007fe0, $mac[4], $mac[5], $flag,
+              $mac[0], $mac[1], $mac[2], $mac[3],
+              @ip, @gw, @nm, $port, 0, 0, 0xaaaaaaaa;
+
+
+    my ($addr, $len) = (0, length $d);
+
+    print "Writing $len bytes at address $addr\n";
+    print hex_dump (0, $d, 'byte', 16);
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_SROM, $len * 65536 + 0x1e0, 
+	      0x02000000 + $addr, 0, $d);
+
+    return ($rc) ? '' : $data;
+}
+
+
+sub cmd_sf_init
+{
+    my $cli = shift;
+
+    return "bad args" unless $cli->{arg_c} == 6;
+
+    my $flag = $cli->{arg_x}->[0];
+    my $mac = $cli->{arg_v}->[1];
+    my @ip = check_ip ($cli->{arg_v}->[2]);
+    my @gw = check_ip ($cli->{arg_v}->[3]);
+    my @nm = check_ip ($cli->{arg_v}->[4]);
+    my $port = $cli->{arg_n}->[5];
+
+    return "bad flag" unless $flag >= 0x8000 && $flag < 0x10000;
+    return "bad MAC" unless $mac =~ /^([0-9a-f]{1,2}:){5}[0-9a-f]{1,2}$/i;
+    return "bad IP" unless $#ip == 3;
+    return "bad GW" unless $#gw == 3;
+    return "bad NM" unless $#nm == 3;
+    return "bad port" unless $port >= 1024 && $port < 65536;
+
+    my @mac = reverse split /:/, $mac;
+    $_ = hex $_ for @mac;
+
+    my $d = pack "N2 C2 n C4 C4 C4 C4 N3 N",
+              0x553a0008, 0xf5007fe0, $mac[4], $mac[5], $flag,
+              $mac[0], $mac[1], $mac[2], $mac[3],
+              @ip, @gw, @nm, $port, 0, 0, 0xaaaaaaaa;
+
+    my ($addr, $len) = (0, length $d);
+
+    print "Writing $len bytes at address $addr\n";
+    print hex_dump (0, $d, 'byte', 16);
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_SF_WRITE,
+				0, $len, 0x02, $d);
+
+    return ($rc) ? '' : $data;
+}
+
+
+sub cmd_srom_ip
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $addr = 16; #const
+
+    return "bad args" if $ac < 0 || $ac > 3;
+
+    return cmd_srom_info () if $ac == 0;
+
+    my $data = '';
+
+    for my $a (0..$ac-1)
+    {
+	my $s = $cli->{arg_v}->[$a];
+	my @ip = check_ip ($s);
+
+	return "bad IP ($s)" if $#ip != 3;
+
+	$data .= pack 'C4', @ip;
+    }
+
+    my $len = length $data;
+
+    print "Writing $len bytes at address $addr\n";
+
+    my ($rc, $error) = send_cmd ($chip, $cpu, $CMD_SROM, $len * 65536 + 0x1e0, 
+	      0x02000000 + $addr, 0, $data);
+
+    return $error unless $rc;
+
+    print "Checking...\n";
+    
+    $rc = cmd_srom_info ();
+    return $rc unless $rc eq '';
+
+    my $read;
+    ($rc, $read) = send_cmd ($chip, $cpu, $CMD_SROM, $len * 65536 + 32,
+			 0x03000000 + $addr, 0, '');
+    return $read unless $rc;
+
+    my $lr = length ($read);
+
+    if ($lr != $len || $data ne $read)
+    {
+	print "Oops! - try again?\n";
+    }
+    else
+    {
+	print "Looks OK!\n";
+    }
+
+    return '';
+}
+
+
+sub cmd_rtr
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+
+    my @rtrc = qw/Loc-P2P Ext-P2P Loc-NN Ext-NN Dump-P2P Dump-NN XX XX/;
+
+    my ($rc, $d) = send_cmd ($chip, $cpu, $CMD_READ,
+			     0xf1000300, 64, $TYPE_WORD, '');
+    return $d unless $rc;
+
+    my @c = unpack "V*", $d;
+
+    for (my $i = 0; $i < 8; $i++)
+    {
+	printf "%-8s - %d\n", $rtrc[$i], $c[8+$i];
+    }
+
+    if ($ac >= 1 && $cli->{arg_v}->[0] eq 'clr')
+    {
+	my $z = pack "V", 0;
+
+	my ($rc, $d) = send_cmd ($chip, $cpu, $CMD_WRITE,
+				 0xf100002c, 4, $TYPE_WORD, $z);
+	return $d unless $rc;
+
+	$z = $z x 8;
+
+	($rc, $d) = send_cmd ($chip, $cpu, $CMD_WRITE,
+			      0xf1000320, 32, $TYPE_WORD, $z);
+	return $d unless $rc;
+
+	$z = pack "V", 0x0000ff00;
+
+	($rc, $d) = send_cmd ($chip, $cpu, $CMD_WRITE,
+			      0xf100002c, 4, $TYPE_WORD, $z);
+   }
+
+    return '';
+}
+
+
+sub cmd_ppt
+{
+    my ($rc, $d0, $d1);
+
+    ($rc, $d0) = send_cmd ($chip, $cpu, $CMD_READ,
+			   0xf1010000, 4, $TYPE_WORD, '');
+    return $d0 unless $rc;
+
+    ($rc, $d1) = send_cmd ($chip, $cpu, $CMD_READ,
+			   0xf1010080, 4, $TYPE_WORD, '');
+    return $d1 unless $rc;
+
+    $d0 = unpack "V", $d0;
+    $d1 = unpack "V", $d1;
+
+    printf "(0, 0) -> %d\n(0, 1) -> %d\n", $d0 & 7, ($d0 >> 3) & 7;
+    printf "(1, 0) -> %d\n(1, 1) -> %d\n", $d1 & 7, ($d1 >> 3) & 7;
+
+    return '';
+}
+
+
+sub cmd_pptl
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $link = $cli->{arg_x}->[0];
+
+    return 'bad args' if $ac != 1 || $link > 5 || $link < 0;
+
+    my ($rc, $d0, $d1);
+
+    ($rc, $d0) = send_cmd ($chip, $cpu, $CMD_LINK_READ,
+			   0xf1010000, 4, $link, '');
+    return $d0 unless $rc;
+
+    ($rc, $d1) = send_cmd ($chip, $cpu, $CMD_LINK_READ,
+			   0xf1010080, 4, $link, '');
+    return $d1 unless $rc;
+
+    $d0 = unpack "V", $d0;
+    $d1 = unpack "V", $d1;
+
+    printf "(0, 0) -> %d\n(0, 1) -> %d\n", $d0 & 7, ($d0 >> 3) & 7;
+    printf "(1, 0) -> %d\n(1, 1) -> %d\n", $d1 & 7, ($d1 >> 3) & 7;
+
+    return '';
+}
+
+
+sub cmd_sw
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $addr = $cli->{arg_x}->[0];
+    my $wdata = $cli->{arg_x}->[1];
+
+    if ($ac == 1)
+    {
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_READ,
+				    $addr, 4, $TYPE_WORD, '');
+	return $data unless $rc;
+
+	my ($d) = unpack 'V', $data;
+	printf "%08x = %08x\n", $addr, $d;
+    }
+    elsif ($ac == 2)
+    {
+	my $d = pack 'V', $wdata;
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_WRITE,
+				    $addr, 4, $TYPE_WORD, $d);
+	return $data unless $rc;
+    }
+    else
+    {
+	return 'bad args';
+    }
+
+    return '';
+}
+
+
+sub cmd_sh
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $addr = $cli->{arg_x}->[0];
+    my $wdata = $cli->{arg_x}->[1];
+
+    if ($ac == 1)
+    {
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_READ,
+				    $addr, 2, $TYPE_HALF, '');
+	return $data unless $rc;
+
+	my ($d) = unpack 'C', $data;
+	printf "%08x = %04x\n", $addr, $d;
+    }
+    elsif ($ac == 2)
+    {
+	my $d = pack 'C', $wdata;
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_WRITE,
+				    $addr, 2, $TYPE_HALF, $d);
+	return $data unless $rc;
+    }
+    else
+    {
+	return 'bad args';
+    }
+
+    return '';
+}
+
+
+sub cmd_sb
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $addr = $cli->{arg_x}->[0];
+    my $wdata = $cli->{arg_x}->[1];
+
+    if ($ac == 1)
+    {
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_READ,
+				    $addr, 1, $TYPE_BYTE, '');
+	return $data unless $rc;
+
+	my ($d) = unpack 'C', $data;
+	printf "%08x = %02x\n", $addr, $d;
+    }
+    elsif ($ac == 2)
+    {
+	my $d = pack 'C', $wdata;
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_WRITE,
+				    $addr, 1, $TYPE_BYTE, $d);
+	return $data unless $rc;
+    }
+    else
+    {
+	return 'bad args';
+    }
+
+    return '';
+}
+
+
+sub cmd_lw
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $link = $cli->{arg_x}->[0];
+    my $addr = $cli->{arg_x}->[1];
+    my $wdata = $cli->{arg_x}->[2];
+
+    return 'bad args' if $ac < 2 || $ac > 3 || $link > 5 || $link < 0;
+
+    if ($ac == 2)
+    {
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_LINK_READ,
+				    $addr, 4, $link, '');
+	return $data unless $rc;
+
+	return 'Read failed' unless length ($data) == 4;
+	my ($d) = unpack 'V', $data;
+	printf "%08x = %08x\n", $addr, $d;
+    }
+    else
+    {
+	my $d = pack 'V', $wdata;
+	my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_LINK_WRITE,
+				    $addr, 4, $link, $d);
+	return $data unless $rc;
+    }
+
+    return '';
+}
+
+
+sub cmd_smemw
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $from = ($ac >= 1) ? $cli->{arg_x}->[0] : 0;
+
+    $from &= ~3;
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_READ,
+				$from, 256, $TYPE_WORD, '');
+    return $data unless $rc;
+
+    print hex_dump ($from, $data, 'word', 32);
+    return '';
+}
+
+
+sub cmd_aplx
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $addr = $cli->{arg_x}->[0];
+
+    return 'bad args' unless $ac == 1;
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_APLX, $addr, 0, 0, '');
+
+    return ($rc) ? '' : $data;
+}
+
+
+my %led = (on => 3, off => 2, inv => 1);
+
+
+sub cmd_led
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $num = $cli->{arg_v}->[0];
+    my $action = $cli->{arg_v}->[1];
+
+    my $c = 0;
+
+    return "bad args" if $ac != 2 || $num !~ /^[0-3]+$/ ||
+	$action !~ /^(on|off|inv)$/;
+
+    for my $l (split //, $num)
+    {
+	$c |= $led{$action} << ($l * 2);
+    }
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_LED, $c, 0, 0, '');
+
+    return ($rc) ? '' : $data;
+}
+
+
+my $CMD_RESET = 55;
+my $CMD_POWER = 57;
+
+sub cmd_reset
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $r = $cli->{arg_v}->[0];
+
+    my $arg = 2;
+    $arg = 0 if $ac == 1 && $r eq "off";
+    $arg = 1 if $ac == 1 && $r eq "on";
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_RESET, $arg, 0, 0, '');
+
+    return ($rc) ? '' : $data;
+}
+
+
+sub cmd_power
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $cmd = $cli->{arg_v}->[0];
+
+    return "bad args" unless $ac == 1 && $cmd =~ /^on|off$/;
+
+    $cmd = ($cmd eq "on") ? 1 : 0;
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $CMD_POWER, $cmd, 0, 0, '');
+
+    return ($rc) ? '' : $data;
+}
+
+
+#------------------------------------------------------------------------------
+
+
+sub cmd_cmd
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $cmd = $cli->{arg_n}->[0];
+    my $arg1 = $cli->{arg_x}->[1];
+    my $arg2 = $cli->{arg_x}->[2];
+    my $arg3 = $cli->{arg_x}->[3];
+
+    return "bad args" if $ac < 1;
+
+    $arg1 ||= 0;
+    $arg2 ||= 0;
+    $arg3 ||= 0;
+
+    my ($rc, $data) = send_cmd ($chip, $cpu, $cmd, $arg1, $arg2, $arg3, '');
+
+    return ($rc) ? '' : $data;
+}
+
+
+sub cmd_debug
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $d = $cli->{arg_n}->[0];
+
+    $debug = $d if $ac > 0;
+    print "Debug $debug\n";
+    return '';
+}
+
+
+sub cmd_sleep
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $time = 1;
+
+    $time = $cli->{arg_v}->[0] if $ac > 0;
+
+    select (undef, undef, undef, $time);
+
+    return '';
+}
+
+sub cmd_timeout
+{
+    my $cli = shift;
+    my $ac = $cli->{arg_c};
+    my $t = $cli->{arg_v}->[0];
+
+    $timeout = $t if defined $t && $t =~ /^\d+\.?\d*$/;
+
+    print "Timeout $timeout\n";
+
+    return '';
+}
+
+
+sub cmd_version
+{
+    print "# ybug - version $version\n";
+
+    return '';
+}
+
+
+#------------------------------------------------------------------------------
+
+my $spin_prompt;
+my $bmp_prompt;
+my $spin_cmds;
+my $bmp_cmds;
+
+sub cmd_spin
+{
+    my $cli = shift;
+
+    (undef, $bmp_prompt) = $cli->cmd ($spin_cmds, $spin_prompt);
+    $dest_ip = $spin_ip;
+    $dest_socket = $spin_socket;
+
+    return '';
+}
+
+
+sub cmd_bmp
+{
+    my $cli = shift;
+
+    return "BMP not defined" unless defined $bmp_target;
+
+    (undef, $spin_prompt) = $cli->cmd ($bmp_cmds, $bmp_prompt);
+    $dest_ip = $bmp_ip;
+    $dest_socket = $bmp_socket;
+
+    return '';
+}
+
+
+#------------------------------------------------------------------------------
+
+$bmp_cmds =
+{
+    spin =>       [\&cmd_spin,
+		 '',
+		 'talk to SpiNNaker'],
+    version =>   [\&cmd_version,
+		 '',
+		 'show ybug version'],
+    debug =>    [\&cmd_debug,
+		 '<num.D>',
+		 'set debug level'],
+    timeout =>  [\&cmd_timeout,
+		 '<secs.R>',
+		 'set target timeout'],
+    sleep =>    [\&cmd_sleep,
+		 '<secs.D>',
+		 'sleep (secs)'],
+    sp =>       [\&cmd_sp,
+		 '<chip_x.D> <chip_y.D> <cpu.D>',
+		 'select BMP chip'],
+    sver =>     [\&cmd_sver,
+		 '',
+		 'show BMP S/W version'],
+    smemb =>    [\&cmd_smemb,
+		 '<addr.X>',
+		 'read BMP memory (bytes)'],
+    smemw =>    [\&cmd_smemw,
+		 '<addr.X>',
+		 'read BMP memory (words)'],
+    flash_write => [\&cmd_flash_write,
+		 '<file.F> <addr.X> [boot]',
+		 'load BMP flash memory from file'],
+    flash_erase => [\&cmd_flash_erase,
+		 '<from.X> <to.X>',
+		 'erase BMP flash memory'],
+    xilinx =>    [\&cmd_xilinx,
+		 '<file.F> [log]',
+		 'load FPGAs from file'],
+    sload =>    [\&cmd_sload,
+		 '<file.F> <addr.X> [log]',
+		 'load BMP memory from file'],
+#    srun =>     [\&cmd_srun,
+#		 '<addr.X> wait|now|all',
+#		 'start BMP execution'],
+    sw =>       [\&cmd_sw,
+		 '<addr.X> [<data.X>]',
+		 'read/write BMP word'],
+    sh =>       [\&cmd_sh,
+		 '<addr.X> [<data.X>]',
+		 'read/write BMP half-word'],
+    sb =>       [\&cmd_sb,
+		 '<addr.X> [<data.X>]',
+		 'read/write BMP byte'],
+    sdump =>    [\&cmd_sdump,
+		 '<file.F> <addr.X> <len.X>',
+		 'dump BMP memory to file'],
+    iptag =>    [\&cmd_iptag,
+		 "<name.S> | '.' | '-' | all <port> <tag>",
+		 'set up IPTAGs'],
+    adc =>      [\&cmd_adc,
+		 '',
+		 'Read voltages on BMP'],
+    cmd =>       [\&cmd_cmd,
+		 '<cmd.D> <arg1.X> <arg2.X> <arg3.X>',
+		 'User specified command'],
+    reset =>     [\&cmd_reset,
+		 '[on|off]',
+		 'Reset Spinnakers'],
+    power =>     [\&cmd_power,
+		 'on|off',
+		 'Switch power on/off'],
+#    ssp0 =>      [\&cmd_ssp0,
+#		 '0|1',
+#		 'Enable/disable SSP0'],
+    sf_read => [\&cmd_sf_read,
+		 '<addr.X>',
+		 'read BMP serial Flash data'],
+    sf_write => [\&cmd_sf_write,
+		 '<file.F> <addr.X>',
+		 'write BMP serial Flash data'],
+    sf_init => [\&cmd_sf_init,
+		 '<Flag.X> <MAC.M> <ip_addr.P> <gw_addr.P> <net_mask.P> <port.D>',
+		 'Initialise Atmel serial ROM'],
+    quit =>     [\&cli::quit,
+		 '',
+		 'quit'],
+    help =>     [\&cli::help,
+		 '',
+		 'provide help'],
+    '@' =>      [\&cli::at,
+		 '<file.F> [quiet]',
+		 'read commands from file'],
+    '?' =>      [\&cli::query,
+		 '',
+		 'list commands'],
+};
+
+
+$spin_cmds =
+{
+    bmp =>       [\&cmd_bmp,
+		 '',
+		 'talk to BMP'],
+    version =>   [\&cmd_version,
+		 '',
+		 'show ybug version'],
+    debug =>    [\&cmd_debug,
+		 '<num.D>',
+		 'set debug level'],
+    timeout =>  [\&cmd_timeout,
+		 '<secs.R>',
+		 'set target timeout'],
+    sleep =>    [\&cmd_sleep,
+		 '<secs.D>',
+		 'sleep (secs)'],
+    sp =>       [\&cmd_sp,
+		 '<chip_x.D> <chip_y.D> <cpu.D>',
+		 'select SpiNNaker chip and CPU'],
+    sver =>     [\&cmd_sver,
+		 '',
+		 'show SpiNNaker S/W version'],
+    smemb =>    [\&cmd_smemb,
+		 '<addr.X>',
+		 'read SpiNNaker memory (bytes)'],
+    smemw =>    [\&cmd_smemw,
+		 '<addr.X>',
+		 'read SpiNNaker memory (words)'],
+    sload =>    [\&cmd_sload,
+		 '<file.F> <addr.X> [log]',
+		 'load SpiNNaker memory from file'],
+    srun =>     [\&cmd_srun,
+		 '<addr.X> wait|now|all',
+		 'start SpiNNaker execution'],
+    sw =>       [\&cmd_sw,
+		 '<addr.X> [<data.X>]',
+		 'read/write Spinnaker word'],
+    sh =>       [\&cmd_sh,
+		 '<addr.X> [<data.X>]',
+		 'read/write Spinnaker half-word'],
+    sb =>       [\&cmd_sb,
+		 '<addr.X> [<data.X>]',
+		 'read/write Spinnaker byte'],
+    boot =>     [\&cmd_boot,
+		 '<file.F>',
+		 'BootROM bootstrap'],
+    sdump =>    [\&cmd_sdump,
+		 '<file.F> <addr.X> <len.X>',
+		 'dump SpiNNaker memory to file'],
+    lboot =>    [\&cmd_lboot,
+		 '<link.D> <file.F>',
+		 'link boot a neighbour'],
+    lw =>       [\&cmd_lw,
+		 '<link.D> <addr.X> [<data.X>]',
+		 'link read/write neighbour word'],
+    lmemw =>    [\&cmd_lmemw,
+		 '<link.D> <addr.X>',
+		 'link read neighbour memory (words)'],
+    lmemb =>    [\&cmd_lmemb,
+		 '<link.D> <addr.X>',
+		 'link read neighbour memory (bytes)'],
+    lload =>    [\&cmd_lload,
+		 '<link.D> <file.F> <addr.X>',
+		 'link load neighbour memory from file'],
+    iptag =>    [\&cmd_iptag,
+		 "<name.S> | '.' | '-' | all <port> <tag>",
+		 'set up IPTAGs'],
+    led =>      [\&cmd_led,
+		 '<0123>* on|off|inv',
+		 'set/clear LEDs'],
+    aplx =>     [\&cmd_aplx,
+		 '<addr.X>',
+		 'do an APLX!'],
+    p2pc =>     [\&cmd_p2pc,
+		 '<dimX.D> <dimY.D>',
+		 'P2P configure'],
+    nnp =>      [\&cmd_nnp,
+		 '<key.X> <data.X>',
+		 'Send NN packet'],
+    ff =>       [\&cmd_ff,
+		 '<file.S> <mask.X>',
+		 'Flood fill'],
+    as =>       [\&cmd_as,
+		 '<addr.X> <mask.X>',
+		 'Application start'],
+    sdp =>       [\&cmd_sdp,
+		 '<port.D> <data.X> <length.D>',
+		 'Send Test SDP'],
+    cmd =>       [\&cmd_cmd,
+		 '<cmd.D> <arg1.X> <arg2.X> <arg3.X>',
+		 'User specified command'],
+    ppt =>       [\&cmd_ppt,
+		 '',
+		 'Dump P2P table'],
+    rtr =>       [\&cmd_rtr,
+		 '[clr]',
+		 'Router stats'],
+    pptl =>      [\&cmd_pptl,
+		 '<link.D>',
+		 'Dump P2P table via link'],
+    gw =>        [\&cmd_gw,
+		 'byte|half|word <addr> <data>',
+		 'Global write'],
+    srom_read => [\&cmd_srom_read,
+		 '<addr.X>',
+		 'read serial ROM data'],
+    srom_write => [\&cmd_srom_write,
+		 '<file.F> <addr.X>',
+		 'write serial ROM data'],
+    srom_erase => [\&cmd_srom_erase,
+		 '',
+		 'erase (all) serial ROM data'],
+    srom_ip =>  [\&cmd_srom_ip,
+		 '<ip_addr.P>*',
+		 'set IP address in serial ROM'],
+    srom_init => [\&cmd_srom_init,
+		 '<Flag.X> <MAC.M> <ip_addr.P> <gw_addr.P> <net_mask.P> <port.D>',
+		 'Initialise serial ROM'],
+    quit =>     [\&cli::quit,
+		 '',
+		 'quit'],
+    help =>     [\&cli::help,
+		 '',
+		 'provide help'],
+    '@' =>      [\&cli::at,
+		 '<file.F> [quiet]',
+		 'read commands from file'],
+    '?' =>      [\&cli::query,
+		 '',
+		 'list commands'],
+};
+
+
+#------------------------------------------------------------------------------
+
+# Scan for board code by Cameron Patterson
+
+sub find_me_a_board
+{
+    my $PORTNO = 54321;			# SpiNNaker native uses this port
+
+    my $socket = IO::Socket::INET->new (LocalPort => $PORTNO, Proto => 'udp');
+
+    die "Can't connect to \"$spin_target:$port\" ($!)\n" unless $socket;	#if we can't open the UDP port to listen
+
+    my $endtime = (time + 10);		# gives us 10 secs to wait on data coming in
+    my $matches = 0;			# how big will the menu be?
+    my @rxip = ();			# array of IP addresses of discovered SpiNNaker boards
+    my @rxmac = ();			# array of MAC addresses of discovered SpiNNaker boards
+    my @rxid = ();			# array of included text descriptions of discovered SpiNNaker boards
+    
+    print "Scanning for boards...\n";	# give a message to the user saying looking for boards
+
+    while ($socket->recv (my $msg, 65536))
+    {
+    	my ($port, $ipaddr) = sockaddr_in ($socket->peername);
+
+    	my ($ver, $cmd, $arg1, $arg2, $arg3, $identifier, @addressing) = unpack 'S L L L a4 a32 C*', $msg;
+    	my @srcip = @addressing[0..3];	# IP address is the first 4 bytes of the addressing block
+    	my @macs = @addressing[6..11];  # MAC is then bytes 6-11.
+
+    	if ($cmd == 65 << 24) # SpiNNaker hello message (endian swopped 65)
+	{  			
+	    if ($arg3 eq 'DHCP') # BootROM with added DHCP (loads from SerialROM)
+	    {			
+		my $got_already = 0;		# assume this is the first time we've seen this board 
+
+		for (my $i=0; $i < $matches; $i++)
+		{
+		    $got_already = 1 if $rxip[$i] eq $ipaddr;
+		}
+
+		unless ($got_already)
+		{
+		    push (@rxip, $ipaddr);	# store the IP address of the new board in the array
+		    push (@rxmac, uc (sprintf ("%02x%02x.%02x%02x.%02x%02x", @macs)));
+		    push (@rxid, $identifier);# store the optional text description of the board used to aid ID.
+		    $matches++;		# we have a new entry for our menu.
+		}
+		
+	    }
+	    elsif ($arg3 eq 'CPTS') # Original BootROM hello message (usually get supressed however)
+	    {		
+		my $got_already = 0;
+
+		for (my $i = 0; $i < $matches; $i++)
+		{
+		    $got_already = 1 if $rxip[$i] eq $ipaddr;
+		}
+
+		unless ($got_already)
+		{
+		    push (@rxip, $ipaddr);
+		    push (@rxmac, 'Fixed LAN IP address');	# add some relevant description
+		    push (@rxid,'BootROM');			# and ID
+		    $matches++;
+		}
+
+	    }
+	    else
+	    {				# Not a BootROM DHCP or a standard BootROM hello, but we'll look anyway
+		my $got_already = 0;
+		for (my $i=0; $i < $matches; $i++)
+		{
+		    $got_already = 1 if $rxip[$i] eq $ipaddr;
+		}
+
+		unless ($got_already)
+		{
+		    push (@rxip,$ipaddr);
+		    push (@rxmac,'Local LAN');		# add some relevant text
+		    push (@rxid,'Unknown ROM/Board');	# describing what we found
+		    $matches++;
+		}
+	    }
+	    last if (time > $endtime);	# break listener loop if have received packet(s), and 10+ secs elapsed
+	}
+    } 
+
+    printf "Found $matches board%s\n\n", ($matches > 1) ? 's' : '';
+
+    for (my $count = 0; $count < $matches; $count++)		# for each discovered chip
+    {
+	my $host = gethostbyaddr ($rxip[$count], AF_INET);	# get DNS entry (if there is one)
+	$host = "NoDNS" unless defined $host;		# if no DNS then say do
+	printf "%-4d $host (%s) ", $count+1, inet_ntoa ($rxip[$count]);	# print menu#, hostname and IP address of each discovered board
+	print "'$rxid[$count-1]' at $rxmac[$count]\n";		# and any text description and MAC address discovered about it
+    }
+
+    my $selection = -1;
+
+    while (($selection < 0) || ($selection > $matches)) # loop until we have a valid menu selection
+    {		
+	print ("\nEnter board number (or 0 to exit):  ");	# offer the user the selection
+	chomp ($selection = <STDIN>);						# get user entered data
+	$selection = -1 unless $selection =~ /^\d+$/;
+    }
+  
+    exit (1) if $selection == 0;
+
+    $spin_target = gethostbyaddr ($rxip[$selection-1], AF_INET);			# read the hostname of the device
+    $spin_target = inet_ntoa ($rxip[$selection-1]) unless defined $spin_target;		# if there's no hostname use the IP address
+}
+
+
+#------------------------------------------------------------------------------
+
+sub usage
+{
+    warn "usage: ybug <options> <hostname>\n";
+    warn "  -port    <num>      - set UDP port number (default $port)\n";
+    warn "  -target  <hostname> - set target (the hard way!)\n";
+    warn "  -version            - print version number\n";
+    warn "  -norl               - don't use 'readline'\n";
+    die  "  -debug              - set debug variable\n";
+}
+
+
+sub process_args
+{
+    my $scan = 0;
+
+    while ($#ARGV >= 0)
+    {
+	my $arg = shift @ARGV;
+
+	if ($arg eq '-port')
+	{
+	    die "port not specified\n" unless $port = shift @ARGV &&
+		$port =~ /^\d+$/;
+	}
+	elsif ($arg eq '-target')
+	{
+	    die "target not specified\n" unless $spin_target = shift @ARGV;
+	}
+	elsif ($arg eq '-bmp')
+	{
+	    die "BMP not specified\n" unless $bmp_target = shift @ARGV;
+	}
+	elsif ($arg eq '-version')
+	{
+	    die "ybug - v$version\n";
+	}
+	elsif ($arg eq '-debug')
+	{
+	    die "debug not specified\n" unless $debug = shift @ARGV &&
+		$debug =~ /^\d+$/;
+	}
+	elsif ($arg eq '-scan')
+	{
+	    $scan = 1;
+	}
+	elsif ($arg eq '-norl')
+	{
+	    $readline = 0;
+	}
+	elsif ($arg eq '-noseq')
+	{
+	    $sequence = 0;
+	}
+	elsif ($arg !~ /^-/)
+	{
+	    $spin_target = $arg;
+	}
+	else
+	{
+	    usage ();
+	}
+    }
+
+    find_me_a_board () if $scan;
+
+    die "target not specified\n" unless defined $spin_target;
+}
+
+
+sub main
+{
+    process_args ();
+
+    $spin_socket = new IO::Socket::INET (PeerAddr => "$spin_target:$port",
+				    Proto => 'udp',
+				    Blocking => 0);
+
+    die "Can't connect to \"$spin_target:$port\" ($!)\n" unless $spin_socket;
+
+    my ($p, $a) = sockaddr_in (getsockname ($spin_socket));
+
+    $dest_ip = $spin_ip = inet_ntoa ($a);
+    $dest_socket = $spin_socket;
+
+    if (defined $bmp_target)
+    {
+	$bmp_socket = new IO::Socket::INET (PeerAddr => "$bmp_target:$port",
+					    Proto => 'udp',
+					    Blocking => 0);
+
+	die "Can't connect to \"$bmp_target:$port\" ($!)\n" unless $bmp_socket;
+
+	my ($p, $a) = sockaddr_in (getsockname ($bmp_socket));
+	$bmp_ip = inet_ntoa ($a);
+
+	$bmp_target =~ s/\..+// unless $bmp_target =~ /^\d/;
+	$bmp_prompt = "$bmp_target:0 > ";
+    }
+
+
+    cmd_version ();
+
+#    print "Host IP $spin_ip\n";
+#    print "Reply port $p\n";
+
+    my $term;
+
+    if ($readline)
+    {
+	use Term::ReadLine;
+	$ENV{PERL_RL} = 'Gnu o=0';
+	$term = Term::ReadLine->new ('ybug');
+    }
+
+    $spin_target =~ s/\..+// unless $spin_target =~ /^\d/;
+
+    $spin_prompt = "$spin_target:0,0,0 > ";
+
+    my $cli = cli::new (\*STDIN, $spin_prompt, $spin_cmds, $term);
+
+    $cli->run;
+}
+
+
+main ();
+
+#------------------------------------------------------------------------------
+
+package cli;
+
+use strict;
+use warnings;
+
+
+#-----------------------------------------------------------------------------
+# new - return a new CLI data structure
+#
+# arg1 - filehandle to read input from
+# arg2 - prompt string
+# arg3 - command list (a hash reference)
+# arg4 - (if present) Term::ReadLine handle
+#
+# returns - CLI data structure
+#-----------------------------------------------------------------------------
+
+sub new
+{
+    my $cli;
+
+    $cli->{fh} = shift;
+    $cli->{prompt} = shift;
+    $cli->{cmd} = shift;
+    $cli->{term} = shift;
+
+    $cli->{level} = 0;
+    $cli->{quiet} = 0;
+    $cli->{tty} = -t $cli->{fh};
+
+    $cli->{term} = undef unless $cli->{tty};
+
+    $cli->{arg_c} = 0;
+    $cli->{arg_v} = [];
+    $cli->{arg_n} = [];
+    $cli->{arg_x} = [];
+
+    bless $cli;
+
+    return $cli;
+}
+
+
+#-----------------------------------------------------------------------------
+# run - execute a CLI using supplied data structure
+#
+# arg1 - CLI data structure (eg made with "new")
+#-----------------------------------------------------------------------------
+
+sub run
+{
+    my $cli = shift;
+
+    my $fh = $cli->{fh};
+    my $tty = $cli->{tty};
+
+    $| = ($tty) ? 1 : 0;
+
+    while (1)
+    {
+	my $prompt = $cli->{prompt};
+	my $cmds = $cli->{cmd};
+	my $arg_v = $cli->{arg_v} = [];
+	my $arg_n = $cli->{arg_n} = [];
+	my $arg_x = $cli->{arg_x} = [];
+	my $term = $cli->{term};
+
+	print $prompt if $tty && ! defined $term;
+
+	$_ = $term->readline ($prompt) if defined $term;
+	$_ = <$fh> unless defined $term;
+
+	unless (defined $_)
+	{
+	    last unless $tty;
+	    print "\n";
+	    next;
+	}
+
+        print "$prompt$_" if !$tty && !$cli->{quiet};
+
+	chomp;
+	s/^\s*|\s*$//g;
+
+	next if /^$/;
+	next if /^\#/;
+
+	@$arg_v = split;
+
+	my $cmd = shift @$arg_v;
+	my $ac = $cli->{arg_c} = @$arg_v;
+
+	for (my $i = 0; $i < $ac; $i++)
+	{
+	    my $s = $arg_v->[$i];
+	    $arg_n->[$i] = undef;
+	    $arg_x->[$i] = undef;
+
+	    $arg_n->[$i] = $1 if $s =~ /^(-?\d+)$/;
+	    $arg_x->[$i] = hex $1 if $s =~ /^([0-9A-Fa-f]+)$/;
+	}
+
+	if (exists $cmds->{$cmd})
+	{
+	    if ($ac == 1 && $arg_v->[0] eq '?')
+	    {
+		my $h = $cmds->{$cmd}->[1];
+		my $p = $cmds->{$cmd}->[2];
+		print "usage:   $cmd $h\n";
+		print "purpose: $p\n";
+	    }
+	    else
+	    {
+		my $proc = $cmds->{$cmd}->[0];
+		my $rc = &$proc ($cli);
+		last if $rc eq '1';
+		print "error: $rc\n" if $rc;
+	    }
+	}
+	else
+	{
+	    print "bad command \"$cmd\"\n";
+	}
+    }
+}
+
+
+#-----------------------------------------------------------------------------
+# cmd - change command list and prompt
+#
+# arg1 - CLI data structure
+# arg2 - new command list (hash reference)
+# arg3 - new prompt
+#
+# returns - old command list and old prompt
+#-----------------------------------------------------------------------------
+
+sub cmd
+{
+    my ($cli, $new_cmd, $new_prompt) = @_;
+
+    my $old_cmd = $cli->{cmd};
+    my $old_prompt = $cli->{prompt};
+
+    $cli->{cmd} = $new_cmd;
+    $cli->{prompt} = $new_prompt;
+
+    return ($old_cmd, $old_prompt);
+}
+
+
+#-----------------------------------------------------------------------------
+# at - command to read CLI commands from a file
+#
+# arg1 - CLI data structure
+#
+# returns 0
+#-----------------------------------------------------------------------------
+
+sub at
+{
+    my $cli = shift;
+    my $quiet = 0;
+
+    return "filename expected" if $cli->{arg_c} < 1;
+    return "\@ nested too deep" if $cli->{level} > 10;
+
+    my $fn = $cli->{arg_v}->[0];
+
+    $quiet = $cli->{arg_v}->[1] if $cli->{arg_c} > 1;
+
+    open my $fh, '<', $fn or return "can't open \"$fn\"";
+
+    my $old_fh = $cli->{fh};
+    my $old_tty = $cli->{tty};
+    my $old_prompt = $cli->{prompt};
+    my $old_quiet = $cli->{quiet};
+    my $old_term = $cli->{term};
+
+    $cli->{fh} = $fh;
+    $cli->{tty} = -t $fh;
+    $cli->{prompt} = '@' . $cli->{prompt};
+    $cli->{quiet} = $quiet;
+    $cli->{term} = undef;
+    $cli->{level}++;
+
+    $cli->run;
+
+    $cli->{level}--;
+    $cli->{fh} = $old_fh;
+    $cli->{tty} = $old_tty;
+    $cli->{prompt} =~ s/^@//;
+    $cli->{quiet} = $old_quiet;
+    $cli->{term} = $old_term;
+
+    close $fh;
+
+    return 0;
+}
+
+
+#-----------------------------------------------------------------------------
+# quit - command to quit current CLI
+#
+# arg1 - CLI data structure
+#
+# returns 1
+#-----------------------------------------------------------------------------
+
+sub quit
+{
+    return 1;
+}
+
+
+#-----------------------------------------------------------------------------
+# help - command to print help information on CLI commands
+#
+# arg1 - CLI data structure
+#
+# returns 0
+#-----------------------------------------------------------------------------
+
+sub help
+{
+    my $cli = shift;
+    my $cmds = $cli->{cmd};
+
+    printf " %-12s %-30s - %s\n", $_, $cmds->{$_}->[1], $cmds->{$_}->[2]
+	for (sort keys %$cmds);
+
+    return 0;
+}
+
+
+#-----------------------------------------------------------------------------
+# query - command to print a list of CLI commands
+#
+# arg1 - CLI data structure
+#
+# returns 0
+#-----------------------------------------------------------------------------
+
+sub query
+{
+    my $cli = shift;
+    my $cmds = $cli->{cmd};
+    my $s = '';
+
+    for (sort keys %$cmds)
+    {
+	if (length "$s $_" > 78)
+	{
+	    print "$s\n";
+	    $s = '';
+	}
+	$s .= " $_";
+    }
+    print "$s\n" if $s ne '';
+
+    return 0;
+}
+

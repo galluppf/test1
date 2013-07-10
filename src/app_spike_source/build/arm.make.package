@@ -1,0 +1,72 @@
+LIB_DIR = ../../spin1_api/src
+INC_DIR = ../../spin1_api/src
+
+CC = armcc -c --c99 --apcs /interwork --cpu=ARM968E-S -I $(INC_DIR) -I ../inc
+AS = armasm --apcs /interwork --keep --cpu=ARM968E-S -I ../inc
+LN = armlink --scatter=app_frame.sct
+
+
+APP_OBJECTS = config.o comms.o dma.o main.o recording.o lfsr.o
+
+
+spike_source: $(APP_OBJECTS) model_spike_source.o
+	$(LN) --output app_frame_spike_source.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) model_spike_source.o
+	fromelf --bin app_frame_spike_source.elf -o app_frame_spike_source.aplx
+	fromelf -cds app_frame_spike_source.elf -o app_frame_spike_source.txt
+	cp app_frame_spike_source.aplx ../../../binaries
+	mv app_frame_spike_source.aplx app_frame_spike_source.elf ../bin
+
+spike_source_array: $(APP_OBJECTS) model_spike_source_array.o
+	$(LN) --output app_frame_spike_source_array.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) model_spike_source_array.o
+	fromelf --bin app_frame_spike_source_array.elf -o app_frame_spike_source_array.aplx
+	fromelf -cds app_frame_spike_source_array.elf -o app_frame_spike_source_array.txt
+	cp app_frame_spike_source_array.aplx ../../../binaries
+	mv app_frame_spike_source_array.aplx app_frame_spike_source_array.elf ../bin
+
+spike_source_poisson: $(APP_OBJECTS) model_spike_source_poisson.o
+	$(LN) --output app_frame_spike_source_poisson.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) model_spike_source_poisson.o
+	fromelf --bin app_frame_spike_source_poisson.elf -o app_frame_spike_source_poisson.aplx
+	fromelf -cds app_frame_spike_source_poisson.elf -o app_frame_spike_source_poisson.txt
+	cp app_frame_spike_source_poisson.aplx  ../../../binaries
+	mv app_frame_spike_source_poisson.aplx app_frame_spike_source_poisson.elf ../bin
+
+
+comms.o: ../src/comms.c ../inc/comms.h ../inc/dma.h
+	$(CC) ../src/comms.c
+
+
+config.o: ../src/config.c ../inc/config.h ../inc/dma.h ../inc/model_general.h
+	$(CC) ../src/config.c
+
+
+dma.o: ../src/dma.c ../inc/comms.h ../inc/dma.h ../inc/model_general.h
+	$(CC) ../src/dma.c
+
+
+lfsr.o: ../src/lfsr.c ../inc/lfsr.h
+	$(CC) ../src/lfsr.c
+
+
+main.o: ../src/main.c  ../inc/comms.h ../inc/config.h  ../inc/dma.h ../inc/model_general.h
+	$(CC) ../src/main.c
+
+
+model_spike_source.o: ../src/model_spike_source.c
+	$(CC) ../src/model_spike_source.c
+
+
+model_spike_source_array.o: ../src/model_spike_source_array.c
+	$(CC) ../src/model_spike_source_array.c
+
+
+model_spike_source_poisson.o: ../src/model_spike_source_poisson.c
+	$(CC) ../src/model_spike_source_poisson.c
+
+
+recording.o: ../src/recording.c ../inc/recording.h
+	$(CC) ../src/recording.c
+
+
+clean:
+	rm -rf *.o  *.txt ../bin/*
+	rm -rf ../doc/*.html ../doc/*.css ../doc/bin ../doc/build ../doc/inc ../doc/src

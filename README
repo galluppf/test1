@@ -1,0 +1,307 @@
+SpiNNaker Package 2.48 (Quarantotto) Setup
+**************************
+
+This document describes PACMAN for 4, 48 node boards, PyNN integration, connections to AER sensors and robots.
+
+Dependencies
+----------------------
+
+- Python 2.7
+- either native ARM C/C++ Compiler, RVCT4.0 [Build 400] **or** GCC cross-compiler for on chip software (arm-none-linux-gnueabi-gcc 4.5.2 - http://www.codesourcery.com/sgpp/lite/arm/portal/release1802)
+- PyNN 0.7.1 (http://neuralensemble.org/trac/PyNN)
+- nengo 564b031 or greater (http://ctnsrv.uwaterloo.ca:8080/jenkins/job/Nengo/lastSuccessfulBuild/artifact/nengo-latest.zip)
+- numpy >= 1.5.1
+- scipy >= 0.8.0
+- sqlite3 >= 3.7.4
+- libsqlite3 (libsqlite3-0, libsqlite3-dev)
+- gcc
+- perl-tk
+- pylab (python-matplotlib) - for plotting results
+
+For ubuntu :: 
+
+   sudo apt-get install python-numpy python-scipy python-sympy python-sqlite libsqlite3-dev sqlite3 gcc perl-tk python-pynn python-matplotlib
+
+
+Installation
+----------------------
+
+From now on PACKAGE_ROOT refers to the directory where you have copied/checked out the SpiNNaker Package.
+
+**ACTION REQUIRED**: You need to open the source.sh file and perform the following actions:
+
+    - set the value to the variable MY_PYNN, which points to your pyNN installation. $MY_PYNN/../ will also be used as the pointer for your PYTHONPATH, and pacman and the binary_files_generation projects will be linked there. e.g.::
+    
+       MY_PYNN=/usr/local/lib/python2.7/dist-packages/pyNN/
+
+    - set MAKEFILE_SPINN_API to specify if using ARM (arm.make.package) or GCC (gcc.make.package) for compiling the API. In the app_frame build directory you will find 2 similar files to compile neural kernels with ARM or GCC. e.g.::
+    
+       MAKEFILE_SPINN_API=arm.make.package       # (using the ARM compiler)
+       or
+       MAKEFILE_SPINN_API=gnu.make.package       # (using the GCC compiler)
+       
+    - If you are using ARM toolchain you also need to configure the ARM ENV section in the source.sh file. If you are using GCC you will need to configure the GCC section
+    
+Directories and environment variables are contained in the source.sh file and all the Makefiles will refer to those variables. Please read the following section on how to use the source file after installation.
+
+After you have modified your source.sh file you can make the package by running the command::
+
+      cd PACKAGE_ROOT
+      ./setup -m
+
+.. warning::
+
+   ATTENTION you might need to be superuser to perform the last step of the installation, which creates links in your $PYTHONPATH. 
+   You will be instructed by the script if so and you will need to re-run **ONLY** ./setup -l with superuser permissions
+
+Install the Nengo interface
++++++++++++++++++++++++++++
+
+If you are running SpiNNaker models with Nengo you have to perform the following additional steps:
+- open your source.sh file and set the MY_NENGO variable to the path containing your Nengo installation
+- setup symbolic links into the Nengo directory by running::
+
+   # update symbolic links in the Nengo directory (specified by the MY_NENGO variable in source.sh)
+   cd PACKAGE_ROOT
+   ./setup -n
+                 
+
+
+Checking your PyNN build
+++++++++++++++++++++++++
+
+To check if your installation was successful check the following:
+
+- The PACKAGE_ROOT/binaries contains:
+
+  - app_frame_izhikevich.aplx
+  - app_frame_lif.aplx
+  - app_frame_lif_cond.aplx
+  - app_frame_spike_source.aplx
+  - app_frame_spike_source_array.aplx
+  - app_dump.aplx
+
+
+- PACKAGE_ROOT/binary_files_generation/lookup_table_generator exist
+
+- open a python shell and verify that you can run the following without errors::
+
+   import pyNN.spiNNaker as p  
+
+- verify you have a link to pyNN.spiNNaker in your $MY_PYNN directory
+
+- verify you have links for pacman and binary_files_generation in your $PYTHONPATH (default location set to $MY_PYNN parent directory)
+
+Using the source file
+----------------------
+
+The source.sh file contains all the internal pointers useful during installation and upgrades. In particular it helps configuring the compiler selected (ARM or GCC) by the variable $MAKEFILE_SPINN_API. It will also add the PACMAN location to the path.
+
+The source.sh file is automatically sourced when you call setup
+
+It is possible however to source manually calling source ./source.sh from the package root, **or automatically add it to your .bashrc file**.
+The advantages of sourcing it are mostly for the ARM/GCC compiiler, as the paths need not to be configured manually but are defined already in the source.sh file
+
+Booting the board
+----------------------
+The board needs to be booted before any model can run on it. 
+In order to do that go into the PACKAGE_ROOT/tools directory and issue the command:: 
+
+./boot.sh <board name/ip>
+
+example::
+
+ ./boot.sh 192.168.1.101
+ 192.168.1.101
+ # ybug - version 1.10
+ 192.168.1.101:0,0,0 > @ ./boot.ybug
+ @192.168.1.101:0,0,0 > ### BOOTING ####
+ @192.168.1.101:0,0,0 > boot ./scamp-2.boot
+ 15092 bytes, 15 blocks
+ @192.168.1.101:0,0,0 > sleep 4
+ @192.168.1.101:0,0,0 > sver
+ SC&MP (Beta) 1.02 at SpiNNaker:0,0,0 (built Thu Mar  8 09:01:20 2012) [2]
+ @192.168.1.101:0,0,0 > p2pc 2 2
+ @192.168.1.101:0,0,0 > sleep 3
+ @192.168.1.101:0,0,0 > sver
+ SC&MP (Beta) 1.02 at SpiNNaker:0,0,0 (built Thu Mar  8 09:01:20 2012) [2]
+
+The pacman.cfg file
+----------------------
+
+The pacman.cfg file in PACKAGE_ROOT/pacman/pacman.cfg contains options to personalize your spiNNaker experience. In particular, to run simulations with PyNN the following sections need to be edited:
+
+[board] section
+++++++++++++++++
+- **system_library**: defines the DB containing the system topology and health status. The file needs to be placed in pacman/sql/::
+
+   # to use a 4 chip board
+   system_library=4_chip_board.db
+   
+   # or to use a 4 chip  board connected to a cochlea   
+   system_library=48_chip_board.db
+
+.. warning::
+
+   If you are using a system_library with virtual chips (as in the cochlea or retina example) **you must** allocate all the virtual cores, otherwise PACMAN will allocate real neurons to virtual chips. If you are not using the retina or the cochlea it is strongly reccomended that you change the system_library to 4_chip_board.db ** this system is deprecated, you should be using ProxyPopulations instead (compatible with 4 and 48 chip boards) **
+
+- **default_board_address**: it contains the default address of the board used with the installation. Useful when running a model directly from PyNN::
+
+   # you can use an IP address 
+   default_board_address = 192.168.1.100
+   
+   # or a hostname
+   default_board_address = amu16
+
+
+[pyNN.spiNNaker] section
++++++++++++++++++++++++++++
+
+- **run_pacman**: if set to *true* PACMAN will be run when PyNN's run() function is called (needed to get results with pynn)
+- **run simulation**: if set to *true* it will initialize the SpiNNaker runtime system, deploying and starting the simulation on default_board_address (needed to get results with pynn) when PyNN's run() function is called
+- **run_app_dump**: if set to *true* it collects live spiking data when the simulation is running and automatically save them in PACKAGE_ROOT/temp_spikes.dat (needed to use getSpikes and printSpikes)
+
+
+Running an Example
+--------------------------------------------
+
+This section shows how to run the IF_cond_exp example from http://www.neuralensemble.org/trac/PyNN/wiki/Examples/IF_cond_exp.
+
+- Make sure you have configured your source file and pacman.cfg correctly
+
+- Boot the board::
+
+   cd PACKAGE_ROOT/tools
+   ./boot.sh 192.168.1.101
+
+- Go to the examples directory and run the IF_cond_exp::
+
+   cd PACKAGE_ROOT/examples
+   python IF_cond_exp.py
+
+- As PyNN's run() instruction is executed the PACMAN process starts translating the model::
+
+   
+- If run_app_dump is set to true in pacman.cfg (needed for this example) the spike_receiver is automatically instantiated and saves spikes in the PACKAGE_ROOT/binaries/temp_spikes.dat. This file is accessed by the printSpikes and getSpikes methods.
+
+- The simulation is loaded on board and executed (if run_pacman and run_simulation in pacman.cfg are set to true). PyNN waits for the end of simulation message from the SpiNNaker board to arrive before continuing execution::
+
+   [ pyNN ] : Loading simulation on board 192.168.1.101
+   # ybug - version 1.10
+   192.168.1.101:0,0,0 > @ ../binaries/automatic.ybug
+   @192.168.1.101:0,0,0 > ### automatically generated ybug script
+   @192.168.1.101:0,0,0 > 
+   @192.168.1.101:0,0,0 > ### HEADER ####
+   @192.168.1.101:0,0,0 > sver
+   ...
+   ...
+   [ pyNN ] : ... done ... waiting for simulation on board 192.168.1.101 on to finish...
+   
+- results are collected with the get_v method and plotted using pylab::
+
+   ifcell.print_v('Results/IF_cond_exp_%s.v' % simulator_name)
+   recorded_v =  ifcell.get_v()
+   
+   import pylab
+   pylab.plot([ i[0] for i in recorded_v ])
+   pylab.show()
+   p.end()
+
+
+The result should look like PACKAGE_ROOT/examples/results/IF_cond_exp.png
+
+.. figure::  ./examples/results/IF_cond_exp.png
+
+   results from running the IF_cond_exp.py example
+
+More examples are in the examples directory.
+
+Updating the package or parts of it
+--------------------------------------------
+The following instructions need to be followed if you receive (or if you write yourself) an update of some particular components:
+
+- if you modify the neural kernel (./src/app_frame/) or the monitoring kernel (PACKAGE_ROOT/src/app_dump) you will need to recompile the aplx. This is done by moving in the PACKAGE_ROOT/src/app_frame/build directory and calling make -f [arm.make.package | gnu.make.package] <neural model>::
+
+   # update the izhikevich neural model (PACKAGE_ROOT/src/app_frame/src/model_izhikevich.c) 
+   cd PACKAGE_ROOT
+   cd src/app_frame/build
+   make -f gnu.make.package izhikevich
+                 
+
+- if you move your package to a different directory or if you have multiple installations and want to switch between them you can run :: 
+
+  ./setup -l 
+
+from PACKAGE_ROOT of the selected package. This uses symbolic links in your PYTHON_PATH to access pyNN, pyNN.spiNNaker, pacman and the binary_files_generation projects. 
+
+.. warning::
+
+   ATTENTION you might need to be superuser to create links in your $PYTHONPATH. You will be instructed by the script if so and you will need to re-run ./setup -l with superuser permissions
+
+
+- if the spin1_api project is updated you will need to rebuild the spinnaker api by going into PACKAGE_ROOT/src/spin1_api/src and run make -f [arm.make.package | gnu.make.package]::
+
+   cd PACKAGE_ROOT/src/spin1_api/src
+   make -f gnu.make.package
+
+
+- whenever you change something in the PACKAGE_ROOT/pacman/sql/model_library.sql (or if that gets updated) you need to run the PACKAGE_ROOT/pacman/sql/update_model_library.sh script::
+
+   cd PACKAGE_ROOT/pacman/sql
+   ./update_model_library.sh
+
+   # or you can use the setup script in the PACKAGE_ROOT directory
+
+   cd PACKAGE_ROOT
+   ./setup -d
+
+
+- whenever you change lookup_table_generator.cpp in PACKAGE_ROOT/binary_files_generator (or if that gets updated) you need to rerun make in the /binary_files_generator directory::
+
+   cd PACKAGE_ROOT/binary_files_generation
+   make clean
+   make
+   
+   # or you can use the setup script in the PACKAGE_ROOT directory
+
+   cd PACKAGE_ROOT
+   ./setup -t
+
+- if you want to update your package to the revision specified in the REVISION variable of the source file you can do so by issuing the ./update_package.sh -s command from the root of the package (ignore if you are not updating through svn)
+
+
+Package structure
+--------------------------------------------
+
+The root directory of the package is marked as ./ (or PACKAGE_ROOT/ in the text)
+
+**HOST SOFTWARE**:
+
+   - ./pynn.spiNNaker               : containing the interface between PyNN and PACMAN (to be linked in the pynn directory)      
+   - ./pacman                       : splitter, partitioner, mapper   
+   - ./binary_files_generation      : containing the portion of PACMAN that generates the binary files for SNN   
+   - ./binaries                     : containing the compiled binaries (program+data) for each core/chip   
+   - ./tools                        : containing all the facilities to load code onboard and run simulations 
+   
+
+
+**CHIP SOFTWARE**:
+
+   - ./src                               : all the software that goes on board is in the directory. 
+   - ./src/spin1_api                     : containing the API (headers and compiled version)
+   - ./src/app_frame                     : different copies application framework projects can be checked out in this directory
+   - ./src/app_frame_1                   : ...
+   - ./src/app_frame_n                   : ... 
+   - ./src/app_frame_nef                 : kernels to be used with the Neural Engineering Framework
+   - ./src/app_dump                      : monitoring kernel
+
+
+Suggested packages
+--------------------------------------------
+ - Neurotools 0.1.0 (Asynchronous Astrocyte)   - visualization of neural results in PyNN format (http://neuralensemble.org/trac/NeuroTools)
+ - networkx 1.1    - Graph analysis/visualisation tool (http://networkx.lanl.gov/)
+ - sqliteman 1.2.2 - Graphical front end for sqlite3 (in your package manager)
+
+
+.. moduleauthor:: SpiNNaker Project, APT Group, University of Manchester, 14/2/2013
+.. moduleauthor:: Francesco Galluppi, SpiNNaker Project, francesco.galluppi@cs.man.ac.uk
