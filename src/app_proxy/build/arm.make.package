@@ -1,0 +1,26 @@
+LIB_DIR = ../../spin1_api/src
+INC_DIR = ../../spin1_api/src
+
+CC = armcc -c --c99 --apcs /interwork --cpu=ARM968E-S -I $(INC_DIR) -I ../inc -DDEBUG
+AS = armasm --apcs /interwork --keep --cpu=ARM968E-S -I ../inc
+LN = armlink --scatter=app_proxy.sct
+
+
+APP_OBJECTS = main.o
+
+
+app_proxy: $(APP_OBJECTS)
+	$(LN) --output app_proxy.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS)
+	fromelf --bin app_proxy.elf -o app_proxy.aplx
+	fromelf -cds app_proxy.elf -o app_proxy.txt
+	cp app_proxy.aplx ../../../binaries/app_proxy.aplx
+	mv app_proxy.aplx app_proxy.elf ../bin
+	
+
+main.o: ../src/main.c
+	$(CC) ../src/main.c
+
+
+clean:
+	rm -rf *.o  *.txt ../bin/*
+	rm -rf ../doc/*.html ../doc/*.css ../doc/bin ../doc/build ../doc/inc ../doc/src

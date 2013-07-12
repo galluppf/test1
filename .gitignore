@@ -1,0 +1,13 @@
+# python compilé
+*.pyc
+
+# g++ temporary outputs
+*.o
+*.aplx
+*.lst
+*.elf
+*.gas
+
+# bkp file
+*~
+

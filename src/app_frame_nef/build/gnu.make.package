@@ -1,0 +1,164 @@
+.SECONDEXPANSION:
+
+LIB_DIR = ../../spin1_api/src
+INC_DIR = ../../spin1_api/src
+
+APP_OBJECTS = config.o comms.o recording.o
+
+FLAT_OBJECTS = dma.o main.o
+
+
+CC := arm-none-linux-gnueabi-gcc -c -O1 -nostdlib -mthumb-interwork -march=armv5te -std=gnu99 -I ../inc -I $(INC_DIR) $(CFLAGS)
+LD := arm-none-linux-gnueabi-ld
+OC := arm-none-linux-gnueabi-objcopy
+OD := arm-none-linux-gnueabi-objdump
+RM := /bin/rm -rf
+CAT := /bin/cat
+CP := cp
+MV := mv
+
+lif_nef_1d : FLAGS = -DDIMENSIONS=1
+lif_nef_2d : FLAGS = -DDIMENSIONS=2
+
+nef_out_1d : FLAGS = -DDIMENSIONS=1
+nef_out_2d : FLAGS = -DDIMENSIONS=2
+
+
+LIBMATH := $(shell which $(LD) | xargs dirname)/../lib/gcc/arm-none-linux-gnueabi/4.5.2/libgcc.a
+
+nef_out_multidimensional: $(APP_OBJECTS) $(FLAT_OBJECTS) model_nef_out_multidimensional.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_nef_out_multidimensional.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_nef_out_multidimensional.elf
+	$(OC) -O binary -j APLX    app_frame_nef_out_multidimensional.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_nef_out_multidimensional.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_nef_out_multidimensional.elf RW_DATA.bin
+	$(OD) -dt app_frame_nef_out_multidimensional.elf > app_frame_nef_out_multidimensional.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_nef_out_multidimensional.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_nef_out_multidimensional.aplx ../../../binaries
+	${MV} app_frame_nef_out_multidimensional.aplx app_frame_nef_out_multidimensional.elf ../bin
+
+nef_out_1d: $(APP_OBJECTS) $(FLAT_OBJECTS) model_nef_out_multidimensional.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_nef_out_multidimensional.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_nef_out_multidimensional.elf
+	$(OC) -O binary -j APLX    app_frame_nef_out_multidimensional.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_nef_out_multidimensional.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_nef_out_multidimensional.elf RW_DATA.bin
+	$(OD) -dt app_frame_nef_out_multidimensional.elf > app_frame_nef_out_multidimensional.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_nef_out_multidimensional.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_nef_out_multidimensional.aplx ../../../binaries/app_frame_nef_out_1d.aplx
+	${MV} app_frame_nef_out_multidimensional.aplx app_frame_nef_out_multidimensional.elf ../bin
+	
+nef_out_2d: $(APP_OBJECTS) $(FLAT_OBJECTS) model_nef_out_multidimensional.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_nef_out_multidimensional.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_nef_out_multidimensional.elf
+	$(OC) -O binary -j APLX    app_frame_nef_out_multidimensional.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_nef_out_multidimensional.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_nef_out_multidimensional.elf RW_DATA.bin
+	$(OD) -dt app_frame_nef_out_multidimensional.elf > app_frame_nef_out_multidimensional.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_nef_out_multidimensional.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_nef_out_multidimensional.aplx ../../../binaries/app_frame_nef_out_2d.aplx
+	${MV} app_frame_nef_out_multidimensional.aplx app_frame_nef_out_multidimensional.elf ../bin
+
+
+
+
+lif_nef_multidimensional: $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif_nef_multidimensional.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif_nef_multidimensional.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_lif_nef_multidimensional.elf
+	$(OC) -O binary -j APLX    app_frame_lif_nef_multidimensional.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_lif_nef_multidimensional.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_lif_nef_multidimensional.elf RW_DATA.bin
+	$(OD) -dt app_frame_lif_nef_multidimensional.elf > app_frame_lif_nef_multidimensional.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_lif_nef_multidimensional.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_lif_nef_multidimensional.aplx ../../../binaries
+	${MV} app_frame_lif_nef_multidimensional.aplx app_frame_lif_nef_multidimensional.elf ../bin
+
+lif_nef_1d: $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif_nef_multidimensional.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif_nef_multidimensional.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_lif_nef_multidimensional.elf
+	$(OC) -O binary -j APLX    app_frame_lif_nef_multidimensional.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_lif_nef_multidimensional.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_lif_nef_multidimensional.elf RW_DATA.bin
+	$(OD) -dt app_frame_lif_nef_multidimensional.elf > app_frame_lif_nef_multidimensional.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_lif_nef_multidimensional.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_lif_nef_multidimensional.aplx ../../../binaries/app_frame_lif_nef_1d.aplx
+	${MV} app_frame_lif_nef_multidimensional.aplx app_frame_lif_nef_multidimensional.elf ../bin
+
+lif_nef_2d: $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif_nef_multidimensional.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif_nef_multidimensional.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_lif_nef_multidimensional.elf
+	$(OC) -O binary -j APLX    app_frame_lif_nef_multidimensional.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_lif_nef_multidimensional.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_lif_nef_multidimensional.elf RW_DATA.bin
+	$(OD) -dt app_frame_lif_nef_multidimensional.elf > app_frame_lif_nef_multidimensional.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_lif_nef_multidimensional.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_lif_nef_multidimensional.aplx ../../../binaries/app_frame_lif_nef_2d.aplx
+	${MV} app_frame_lif_nef_multidimensional.aplx app_frame_lif_nef_multidimensional.elf ../bin
+
+
+lif_32: $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif_32.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif_32.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_lif_32.elf
+	$(OC) -O binary -j APLX    app_frame_lif_32.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_lif_32.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_lif_32.elf RW_DATA.bin
+	$(OD) -dt app_frame_lif_32.elf > app_frame_lif_32.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_lif_32.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_lif_32.aplx ../../../binaries
+	${MV} app_frame_lif_32.aplx app_frame_lif_32.elf ../bin
+
+nef_out: $(APP_OBJECTS) $(FLAT_OBJECTS) model_nef_out.o app_frame.lnk
+	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_nef_out.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_nef_out.elf
+	$(OC) -O binary -j APLX    app_frame_nef_out.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_nef_out.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_nef_out.elf RW_DATA.bin
+	$(OD) -dt app_frame_nef_out.elf > app_frame_nef_out.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_nef_out.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_nef_out.aplx ../../../binaries
+	${MV} app_frame_nef_out.aplx app_frame_nef_out.elf ../bin
+
+
+comms.o: ../src/comms.c ../inc/comms.h ../inc/dma.h
+	$(CC) $(FLAGS) ../src/comms.c
+
+
+config.o: ../src/config.c ../inc/config.h ../inc/dma.h ../inc/model_general.h
+	$(CC) $(FLAGS) ../src/config.c
+
+
+dma.o: ../src/dma.c ../inc/comms.h ../inc/dma.h ../inc/model_general.h
+	$(CC) $(FLAGS) ../src/dma.c
+
+recording.o: ../src/recording.c ../inc/recording.h
+	$(CC) $(FLAGS) ../src/recording.c
+
+
+main.o: ../src/main.c  ../inc/comms.h ../inc/config.h  ../inc/dma.h ../inc/model_general.h
+	$(CC) $(FLAGS) ../src/main.c
+
+
+model_nef_out_multidimensional.o: ../src/model_nef_out_multidimensional.c ../inc/dma.h ../inc/model_general.h ../inc/model_nef_out_multidimensional.h ../inc/recording.h
+	$(CC) $(FLAGS) ../src/model_nef_out_multidimensional.c
+
+model_lif_32.o: ../src/model_lif_32.c ../inc/dma.h ../inc/model_general.h ../inc/model_lif_32.h ../inc/recording.h
+	$(CC) $(FLAGS) ../src/model_lif_32.c
+
+model_lif_nef_multidimensional.o: ../src/model_lif_nef_multidimensional.c ../inc/dma.h ../inc/model_general.h ../inc/model_lif_nef_multidimensional.h ../inc/recording.h
+	$(CC) $(FLAGS) ../src/model_lif_nef_multidimensional.c
+
+model_nef_out.o: ../src/model_nef_out.c ../inc/dma.h ../inc/model_general.h ../inc/model_nef_out.h ../inc/recording.h
+	$(CC) $(FLAGS) ../src/model_nef_out.c
+
+
+clean:
+	$(RM) *.o  *.txt ../bin/* *~
+	$(RM) ../doc/*.html ../doc/*.css ../doc/bin ../doc/build ../doc/inc ../doc/src

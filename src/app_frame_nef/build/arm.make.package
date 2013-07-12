@@ -1,0 +1,116 @@
+LIB_DIR = ../../spin1_api/src
+INC_DIR = ../../spin1_api/src
+
+CC = armcc -c --c99 --apcs /interwork --cpu=ARM968E-S -I $(INC_DIR) -I ../inc -DDEBUG
+AS = armasm --apcs /interwork --keep --cpu=ARM968E-S -I ../inc
+LN = armlink --scatter=app_frame.sct
+
+
+APP_OBJECTS = config.o comms.o dma.o main.o recording.o
+
+
+izhikevich: $(APP_OBJECTS) model_izhikevich.o
+	$(LN) --output app_frame_izhikevich.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) model_izhikevich.o
+	fromelf --bin app_frame_izhikevich.elf -o app_frame_izhikevich.aplx
+	fromelf -cds app_frame_izhikevich.elf -o app_frame_izhikevich.txt
+	mv app_frame_izhikevich.aplx app_frame_izhikevich.elf ../bin
+
+
+lif: $(APP_OBJECTS) model_lif.o
+	$(LN) --output app_frame_lif.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) model_lif.o
+	fromelf --bin app_frame_lif.elf -o app_frame_lif.aplx
+	fromelf -cds app_frame_lif.elf -o app_frame_lif.txt
+	mv app_frame_lif.aplx app_frame_lif.elf ../bin
+
+
+lif_32: $(APP_OBJECTS) model_lif_32.o
+	$(LN) --output app_frame_lif_32.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) model_lif_32.o
+	fromelf --bin app_frame_lif_32.elf -o app_frame_lif_32.aplx
+	fromelf -cds app_frame_lif_32.elf -o app_frame_lif_32.txt
+	mv app_frame_lif_32.aplx app_frame_lif_32.elf ../bin
+
+
+spike_source: $(APP_OBJECTS) model_spike_source.o
+	$(LN) --output app_frame_spike_source.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) model_spike_source.o
+	fromelf --bin app_frame_spike_source.elf -o app_frame_spike_source.aplx
+	fromelf -cds app_frame_spike_source.elf -o app_frame_spike_source.txt
+	mv app_frame_spike_source.aplx app_frame_spike_source.elf ../bin
+
+lif_nef: $(APP_OBJECTS) model_lif_nef.o
+	$(LN) --output app_frame_lif_nef.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) model_lif_nef.o
+	fromelf --bin app_frame_lif_nef.elf -o app_frame_lif_nef.aplx
+	fromelf -cds app_frame_lif_nef.elf -o app_frame_lif_nef.txt
+	mv app_frame_lif_nef.aplx app_frame_lif_nef.elf ../bin
+
+lif_nef_multidimensional: $(APP_OBJECTS) model_lif_nef_multidimensional.o
+	$(LN) --output app_frame_lif_nef_multidimensional.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) model_lif_nef_multidimensional.o
+	fromelf --bin app_frame_lif_nef_multidimensional.elf -o app_frame_lif_nef_multidimensional.aplx
+	fromelf -cds app_frame_lif_nef_multidimensional.elf -o app_frame_lif_nef_multidimensional.txt
+	mv app_frame_lif_nef_multidimensional.aplx app_frame_lif_nef_multidimensional.elf ../bin
+
+
+nef_out: $(APP_OBJECTS) model_nef_out.o
+	$(LN) --output app_frame_nef_out.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) model_nef_out.o
+	fromelf --bin app_frame_nef_out.elf -o app_frame_nef_out.aplx
+	fromelf -cds app_frame_nef_out.elf -o app_frame_nef_out.txt
+	mv app_frame_nef_out.aplx app_frame_nef_out.elf ../bin
+
+nef_out_multidimensional: $(APP_OBJECTS) model_nef_out_multidimensional.o
+	$(LN) --output app_frame_nef_out_multidimensional.elf $(LIB_DIR)/spin1_api_lib.o $(APP_OBJECTS) model_nef_out_multidimensional.o
+	fromelf --bin app_frame_nef_out_multidimensional.elf -o app_frame_nef_out_multidimensional.aplx
+	fromelf -cds app_frame_nef_out_multidimensional.elf -o app_frame_nef_out_multidimensional.txt
+	mv app_frame_nef_out_multidimensional.aplx app_frame_nef_out_multidimensional.elf ../bin
+
+
+comms.o: ../src/comms.c ../inc/comms.h ../inc/dma.h
+	$(CC) ../src/comms.c
+
+
+config.o: ../src/config.c ../inc/config.h ../inc/dma.h ../inc/model_general.h
+	$(CC) ../src/config.c
+
+
+dma.o: ../src/dma.c ../inc/comms.h ../inc/dma.h ../inc/model_general.h
+	$(CC) ../src/dma.c
+
+
+main.o: ../src/main.c  ../inc/comms.h ../inc/config.h  ../inc/dma.h ../inc/model_general.h
+	$(CC) ../src/main.c
+
+
+model_izhikevich.o: ../src/model_izhikevich.c ../inc/dma.h ../inc/model_general.h ../inc/model_izhikevich.h ../inc/recording.h
+	$(CC) ../src/model_izhikevich.c
+
+
+model_lif.o: ../src/model_lif.c ../inc/model_general.h ../inc/recording.h
+	$(CC) ../src/model_lif.c
+
+model_lif_32.o: ../src/model_lif_32.c ../inc/model_general.h ../inc/recording.h
+	$(CC) ../src/model_lif_32.c
+
+
+model_lif_nef.o: ../src/model_lif_nef.c ../inc/model_general.h ../inc/recording.h
+	$(CC) ../src/model_lif_nef.c
+
+model_lif_nef_multidimensional.o: ../src/model_lif_nef_multidimensional.c ../inc/model_general.h ../inc/recording.h
+	$(CC) ../src/model_lif_nef_multidimensional.c
+
+
+model_nef_out.o: ../src/model_nef_out.c ../inc/model_general.h ../inc/recording.h
+	$(CC) ../src/model_nef_out.c
+
+model_nef_out_multidimensional.o: ../src/model_nef_out_multidimensional.c ../inc/model_general.h ../inc/recording.h
+	$(CC) ../src/model_nef_out_multidimensional.c
+
+
+model_spike_source.o: ../src/model_spike_source.c
+	$(CC) ../src/model_spike_source.c
+
+
+recording.o: ../src/recording.c ../inc/recording.h
+	$(CC) ../src/recording.c
+
+
+clean:
+	rm -rf *.o  *.txt ../bin/*
+	rm -rf ../doc/*.html ../doc/*.css ../doc/bin ../doc/build ../doc/inc ../doc/src
