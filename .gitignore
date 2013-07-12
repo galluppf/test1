@@ -11,3 +11,9 @@
 # bkp file
 *~
 
+# SpiNNaker generated data files
+*.dat
+
+# logfiles
+*.log
+
