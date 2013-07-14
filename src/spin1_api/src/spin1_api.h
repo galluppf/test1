@@ -101,6 +101,7 @@ void spin1_kill(uint error);
 void spin1_set_timer_tick(uint time);
 void spin1_set_core_map(uint chips, uint * core_map);
 uint spin1_get_simulation_time(void);
+uint spin1_get_us_since_last_tick(void);
 void spin1_delay_us (uint n);
 // ------------------------------------------------------------------------
 

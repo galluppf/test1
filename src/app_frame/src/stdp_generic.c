@@ -319,12 +319,4 @@ void send_weight (unsigned int currentSimTime, synaptic_row_t *row_address, unsi
 
 #endif
 
-#ifdef __GNUC__
-void raise()
-{
-    io_printf (IO_STD, "Division by zero in stdp_tts.c load_stdp_config_data()\n");
-    io_printf (IO_STD, "Error: division by 0 - Terminating\n");
-    while (1);
-}
-#endif
 

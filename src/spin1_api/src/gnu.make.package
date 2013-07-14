@@ -15,6 +15,8 @@ AS := arm-none-linux-gnueabi-as -mthumb-interwork -march=armv5te --defsym GNU=1
 LD := arm-none-linux-gnueabi-ld
 OC := arm-none-linux-gnueabi-objcopy
 
+LIBMATH := $(shell which $(LD) | xargs dirname)/../lib/gcc/arm-none-linux-gnueabi/4.5.2/libgcc.a
+
 ifeq ($(THUMB),yes)
   CT += -mthumb -DTHUMB
   AS += --defsym THUMB=1
@@ -24,7 +26,7 @@ endif
 API_OBJS = sark_init.o sark.o spin1_isr.o spin1_api.o spinn_io.o
 
 lib: $(API_OBJS)
-	$(LD) -T sark.lnk -nostdlib -i -o spin1_api_gnulib.o $(API_OBJS)
+	$(LD) -T sark.lnk -nostdlib -i -o spin1_api_gnulib.o $(API_OBJS) $(LIBMATH)
 
 sark_init.o: spinnaker.h sark_init.s
 	../../../tools/h2asm $(INC_DIR)/spinnaker.h | ../../../tools/arm2gas > spinnaker.gas

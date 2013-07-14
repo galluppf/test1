@@ -337,6 +337,23 @@ uint spin1_get_simulation_time()
 /*
 *******/
 
+/****f* spin1_api.c/spin1_get_us_since_last_tick(void)
+*
+* SUMMARY
+*  This function returns the number of microseconds which have elapsed since
+*  the last tick registered by the simulation time.
+*
+* SYNOPSIS
+*  uint spin1_get_us_since_last_tick()
+*
+* OUTPUTS
+*  microseconds since last simulation tick.
+*
+* SOURCE
+*/
+uint spin1_get_us_since_last_tick() {
+  return (tc[T1_LOAD] - tc[T1_COUNT]) / sv->cpu_clk;
+}
 
 
 /****f* spin1_api.c/spin1_kill
@@ -2578,3 +2595,11 @@ void rts_cleanup (void)
 /*
 *******/
 // ------------------------------------------------------------------------
+
+#ifdef __GNUC__
+void raise()
+{
+    io_printf (IO_STD, "Error: division by 0 - Terminating\n");
+    while (1);
+}
+#endif
