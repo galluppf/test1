@@ -1,6 +1,27 @@
 from pyNN.standardmodels import cells, build_translations, ModelNotAvailable
 from pyNN import errors
 
+class DendriticSynchrony(cells.IF_curr_exp):
+    """Neural model detecting synchrony of events arriving to different
+    dendrites of a neuron with microsecond precision."""
+    __name__ = "DendriticSynchrony"
+    cell_params = ['last1', 'last2', 'refractory_period', 'delay_window', 'last_spike']
+    synapses  =   {'input1': 0, 'input2': 1}
+    default_parameters = {'last1' : 0, 'last2': 0, 'refractory_period':0, 'delay_window' : 200, 'last_spike' : 0}
+    def __init__(self):
+        self.__name__ = __name__
+        pass
+
+class DelayUs(cells.IF_curr_exp):
+    """Neural model of a delay line with microsecond precision."""
+    __name__ = "DelayUs"
+    cell_params = ['delay']
+    synapses  =   {'input': 0}
+    default_parameters = {}
+    def __init__(self):
+        self.__name__ = __name__
+        pass
+
 class IF_curr_exp(cells.IF_curr_exp):
     """Leaky integrate and fire model with fixed threshold and
     decaying-exponential post-synaptic current. (Separate synaptic currents for

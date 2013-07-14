@@ -94,6 +94,12 @@ INSERT INTO "cell_parameters" VALUES(1,86,100,'rate','Q','int(math.exp(-1000/par
 INSERT INTO "cell_parameters" VALUES(2,87,100,'start','I','int(params[''start''][i])');
 INSERT INTO "cell_parameters" VALUES(3,88,100,'duration','I','int(params[''start''][i] + params[''duration''][i])');
 INSERT INTO "cell_parameters" VALUES(4,89,100,'time_to_next_spike','i','poisson.rvs(1000/params[''rate''][i])');
+INSERT INTO "cell_parameters" VALUES(1,97,11,'last1','i','int(value)');
+INSERT INTO "cell_parameters" VALUES(2,98,11,'last2','i','int(value)');
+INSERT INTO "cell_parameters" VALUES(3,99,11,'refractory_period','i','int(value)');
+INSERT INTO "cell_parameters" VALUES(4,100,11,'delay_window','i','int(value)');
+INSERT INTO "cell_parameters" VALUES(5,101,11,'last_spike','i','int(value)');
+INSERT INTO "cell_parameters" VALUES(1,102,12,'delay','i','int(value)');
 CREATE TABLE "flags" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
     "flag_name" TEXT,
@@ -126,6 +132,8 @@ INSERT INTO "cell_types" VALUES(100,2048,'SpikeSourcePoisson','app_frame_spike_s
 INSERT INTO "cell_types" VALUES(101,1,'SpikeSink','app_frame_spike_sink.aplx');
 INSERT INTO "cell_types" VALUES(102,1,'Recorder','app_monitoring.aplx');
 INSERT INTO "cell_types" VALUES(103,2048,'SpikeSource','app_frame_spike_source.aplx');
+INSERT INTO "cell_types" VALUES(11,100,'DendriticSynchrony','app_frame_dendritic_synchrony.aplx');
+INSERT INTO "cell_types" VALUES(12,100,'DelayUs','app_frame_delay_us.aplx');
 CREATE TABLE synapse_types (
     id INTEGER PRIMARY KEY,
     "synapse_name" TEXT,
@@ -154,6 +162,9 @@ INSERT INTO "synapse_types" VALUES(22,'excitatory',0,7,'[[0, 0, 0, 0], [0, 1, 0x
 INSERT INTO "synapse_types" VALUES(23,'inhibitory',1,7,'[[0, 0, 0, 0], [0, 1, 0x7FF, 21], [0, 65536, 0xFFFFF, 0], [0, 0, 0, 0], [0, 1, 0x1, 20]]');
 INSERT INTO "synapse_types" VALUES(24,'excitatory',0,5,'[[0, 0, 0, 0], [0, 1, 0x7F, 25], [0, 65536, 0xFFFFFF, 0], [0, 0, 0, 0], [0, 1, 0x1, 24]]');
 INSERT INTO "synapse_types" VALUES(25,'inhibitory',1,5,'[[0, 0, 0, 0], [0, 1, 0x7F, 25], [0, 65536, 0xFFFFFF, 0], [0, 0, 0, 0], [0, 1, 0x1, 24]]');
+INSERT INTO "synapse_types" VALUES(29,'input1',0,11,'[[-1, 1, 0xF, 28],[0, 1, 0x7FF, 16],[0, 256, 0x1FFF, 0],[0, 1, 0x1, 27],[0, 1, 0x7, 13]]');
+INSERT INTO "synapse_types" VALUES(30,'input2',1,11,'[[-1, 1, 0xF, 28],[0, 1, 0x7FF, 16],[0, -256, 0x1FFF, 0],[0, 1, 0x1, 27],[0, 1, 0x7, 13]]');
+INSERT INTO "synapse_types" VALUES(31,'input',0,12,'[[-1, 1, 0xF, 28],[0, 1, 0x7FF, 16],[0, 256, 0x1FFF, 0],[0, 1, 0x1, 27],[0, 1, 0x7, 13]]');
 CREATE TABLE plasticity_suffix (
     "id" INTEGER PRIMARY KEY,
     "model_name" TEXT,

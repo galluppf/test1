@@ -58,6 +58,8 @@ make_models()
     
     # make neuron models
     make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API dendritic_synchrony
+    make -f $MAKEFILE_SPINN_API delay_us
     make -f $MAKEFILE_SPINN_API lif
     make -f $MAKEFILE_SPINN_API lif_cond
     make -f $MAKEFILE_SPINN_API izhikevich
