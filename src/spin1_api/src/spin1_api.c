@@ -65,6 +65,12 @@ isr_t def_fiq_isr;
 int fiq_event = -1;
 // ---------------------
 
+// ---------------------
+/* scheduled callback */
+// ---------------------
+volatile callback_t scheduled_t2_cback;
+// ---------------------
+
 // ---------------
 /* dma transfer */
 // ---------------
@@ -154,11 +160,13 @@ extern void __attribute__ ((interrupt ("IRQ"))) cc_tx_empty_isr (void);
 extern void __attribute__ ((interrupt ("IRQ"))) dma_done_isr (void);
 extern void __attribute__ ((interrupt ("IRQ"))) dma_error_isr (void);
 extern void __attribute__ ((interrupt ("IRQ"))) timer1_isr (void);
+extern void __attribute__ ((interrupt ("IRQ"))) timer2_isr (void);
 extern void __attribute__ ((interrupt ("IRQ"))) sys_controller_isr (void);
 extern void __attribute__ ((interrupt ("IRQ"))) soft_int_isr (void);
 extern void __attribute__ ((interrupt ("IRQ"))) cc_rx_ready_fiqsr (void);
 extern void __attribute__ ((interrupt ("IRQ"))) dma_done_fiqsr (void);
 extern void __attribute__ ((interrupt ("IRQ"))) timer1_fiqsr (void);
+extern void __attribute__ ((interrupt ("IRQ"))) timer2_fiqsr (void);
 extern void __attribute__ ((interrupt ("IRQ"))) soft_int_fiqsr (void);
 #else
 extern __irq void barrier_packet_handler (void);
@@ -168,11 +176,13 @@ extern __irq void cc_tx_empty_isr (void);
 extern __irq void dma_done_isr (void);
 extern __irq void dma_error_isr (void);
 extern __irq void timer1_isr (void);
+extern __irq void timer2_isr (void);
 extern __irq void sys_controller_isr (void);
 extern __irq void soft_int_isr (void);
 extern __irq void cc_rx_ready_fiqsr (void);
 extern __irq void dma_done_fiqsr (void);
 extern __irq void timer1_fiqsr (void);
+extern __irq void timer2_fiqsr (void);
 extern __irq void soft_int_fiqsr (void);
 #endif
 // ----------------
@@ -1751,6 +1761,43 @@ void configure_timer1(uint time)
 /*
 *******/
 
+/****f* spin1_api.c/schedule_trigger_timer2
+*
+* SUMMARY
+*  This function configures timer 2 to schedule a callback after a given number
+*  of microseconds specified by `delay_us'. Firstly, timer 2 is disabled and
+*  any pending interrupts are cleared. Then timer 2 load register is loaded
+*  with the core clock frequency (set by the monitor and recorded in system
+*  RAM MHz) multiplied by `delay_us' and finally timer 2 is
+*  loaded with the configuration below.
+*
+*    [0]   One-shot/wrapping     One-shot
+*    [1]   Timer size            32 bit
+*    [3:2] Input clock divide    1
+*    [5]   IRQ enable            Enabled
+*    [6]   Mode                  Periodic
+*    [7]   Timer enable          Enabled
+*
+* SYNOPSIS
+*  void schedule_trigger_timer2(callback_t cback, uint delay_us)
+*
+* INPUTS
+*  uint delay_us: timer trigger delay in microseconds
+*
+* SOURCE
+*/
+void schedule_trigger_timer2(callback_t cback, uint delay_us)
+{
+  tc[T2_CONTROL] = 0;
+  tc[T2_INT_CLR] = 1;
+  scheduled_t2_cback = cback;
+  tc[T2_LOAD] = sv->cpu_clk * delay_us;
+  tc[T2_BG_LOAD] = 0;
+  tc[T2_CONTROL] = 0xe3;
+}
+/*
+*******/
+
 
 
 /****f* spin1_api.c/configure_vic
@@ -1775,6 +1822,7 @@ void configure_vic()
 {
   uint fiq_select = 0;
   uint int_select = ((1 << TIMER1_INT)   |
+                     (1 << TIMER2_INT)   |
                      (1 << SOFTWARE_INT) |
                      (1 << DMA_ERR_INT)  |
                      (1 << DMA_DONE_INT)
@@ -1812,6 +1860,10 @@ void configure_vic()
   /* configure the timer1 interrupt */
   vic_vectors[TIMER1_PRIORITY]  = timer1_isr;
   vic_controls[TIMER1_PRIORITY] = 0x20 | TIMER1_INT;
+
+  /* configure the timer2 interrupt */
+  vic_vectors[TIMER2_PRIORITY]  = timer2_isr;
+  vic_controls[TIMER2_PRIORITY] = 0x20 | TIMER2_INT;
 
   /* configure the TX empty interrupt but don't enable it yet! */
   vic_vectors[CC_TMT_PRIORITY] = cc_tx_empty_isr;

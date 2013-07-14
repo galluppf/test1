@@ -22,6 +22,8 @@ extern dma_queue_t dma_queue;
 extern tx_packet_queue_t tx_packet_queue;
 extern volatile uint wberrors;
 
+extern volatile callback_t scheduled_t2_cback;
+
 // ----------------------------------
 /* pseudo-random number generation */
 // ----------------------------------
@@ -355,6 +357,38 @@ __irq void timer1_isr()
 /*
 *******/
 
+/****f* spin1_isr.c/timer2_isr
+*
+* SUMMARY
+*  This interrupt service routine is called upon countdown of the processor's
+*  second timer to zero. In response, a callback is scheduled.
+*
+* SYNOPSIS
+*  __irq void timer2_isr()
+*
+* SOURCE
+*/
+#ifdef __GNUC__
+void  __attribute__ ((interrupt ("IRQ"))) timer2_isr (void)
+#else
+__irq void timer2_isr()
+#endif
+{
+  /* clear timer interrupt */
+  tc[T2_INT_CLR] = 1;
+
+  /* Schedule the callback */
+  spin1_schedule_callback(scheduled_t2_cback,
+                          ticks,
+                          (tc[T1_LOAD] - tc[T1_COUNT]) / sv->cpu_clk,
+                          1);
+
+  /* ack VIC */
+  vic[VIC_VADDR] = 1;
+}
+/*
+*******/
+
 
 /****f* spin1_isr.c/soft_int_isr
 *
@@ -503,6 +537,39 @@ __irq void timer1_fiqsr()
 
   /* execute preeminent callback */
   callback[TIMER_TICK].cback(ticks, NULL);
+}
+/*
+*******/
+
+/****f* spin1_isr.c/timer2_fiqsr
+*
+* SUMMARY
+*  This interrupt service routine is called upon countdown of the processor's
+*  second timer to zero. In response, a callback is scheduled.
+*
+* SYNOPSIS
+*  __irq void timer2_fiqsr()
+*
+* SOURCE
+*/
+#ifdef __GNUC__
+void  __attribute__ ((interrupt ("IRQ"))) timer2_fiqsr (void)
+#else
+__irq void timer2_fiqsr()
+#endif
+{
+  /* clear timer interrupt */
+  tc[T2_INT_CLR] = 1;
+  spin1_led_control(LED_INV(1));
+
+  /* Schedule the callback */
+  spin1_schedule_callback(scheduled_t2_cback,
+                          ticks,
+                          (tc[T1_LOAD] - tc[T1_COUNT]) / sv->cpu_clk,
+                          1);
+
+  /* ack VIC */
+  vic[VIC_VADDR] = 1;
 }
 /*
 *******/

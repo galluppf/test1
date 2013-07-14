@@ -127,13 +127,14 @@
 // -----------------------
 // VIC priorities
 // -----------------------
-#define RX_READY_PRIORITY      3
-#define DMA_DONE_PRIORITY      2
+#define RX_READY_PRIORITY      4
+#define DMA_DONE_PRIORITY      3
 #define TIMER1_PRIORITY        1
-#define CC_TMT_PRIORITY        4
-#define SOFT_INT_PRIORITY      5
+#define TIMER2_PRIORITY        2
+#define CC_TMT_PRIORITY        5
+#define SOFT_INT_PRIORITY      6
 #if USE_WRITE_BUFFER == TRUE
-  #define DMA_ERR_PRIORITY     6
+  #define DMA_ERR_PRIORITY     7
 #endif
 
 // -----------------------

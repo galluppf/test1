@@ -113,6 +113,7 @@ void spin1_callback_on(uint event_id, callback_t cback, int priority);
 void spin1_callback_off(uint event_id);
 uint spin1_schedule_callback(callback_t cback, uint arg0, uint arg1, uint priority);
 uint spin1_trigger_user_event(uint arg0, uint arg1);
+void schedule_trigger_timer2(callback_t cback, uint delay_us);
 // ------------------------------------------------------------------------
 
 
