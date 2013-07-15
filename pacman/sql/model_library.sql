@@ -132,8 +132,8 @@ INSERT INTO "cell_types" VALUES(100,2048,'SpikeSourcePoisson','app_frame_spike_s
 INSERT INTO "cell_types" VALUES(101,1,'SpikeSink','app_frame_spike_sink.aplx');
 INSERT INTO "cell_types" VALUES(102,1,'Recorder','app_monitoring.aplx');
 INSERT INTO "cell_types" VALUES(103,2048,'SpikeSource','app_frame_spike_source.aplx');
-INSERT INTO "cell_types" VALUES(11,100,'DendriticSynchrony','app_frame_dendritic_synchrony.aplx');
-INSERT INTO "cell_types" VALUES(12,100,'DelayUs','app_frame_delay_us.aplx');
+INSERT INTO "cell_types" VALUES(11,100,'SynchronyDetector','app_frame_async_synchrony_detector.aplx');
+INSERT INTO "cell_types" VALUES(12,100,'DendriticDelay','app_frame_async_dendritic_delay.aplx');
 CREATE TABLE synapse_types (
     id INTEGER PRIMARY KEY,
     "synapse_name" TEXT,

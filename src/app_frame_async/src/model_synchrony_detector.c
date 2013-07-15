@@ -6,24 +6,23 @@
 #include "config.h"
 #include "dma.h"
 #include "model_general.h"
-#include "model_dendritic_synchrony.h"
+#include "model_synchrony_detector.h"
 #include "recording.h"
 
 // Neuron data structures
 uint num_populations;
 population_t *population;
-psp_buffer_t *psp_buffer;
 
-void buffer_post_synaptic_potentials(void *dma_copy, uint row_size)
+void synaptic_event(void *dma_copy, uint row_size)
 {
 #ifdef DEBUG
-    io_printf(IO_STD, "Inside buffer_post_synaptic_potentials\n");
+    io_printf(IO_STD, "Inside synaptic_event\n");
 #endif
 
     uint time = spin1_get_simulation_time()*1000 + spin1_get_us_since_last_tick();
 
     synaptic_row_t *synaptic_row = (synaptic_row_t *) dma_copy;
-    neuron_t *neuron = (neuron_t *) population[0].neuron;
+    neuron_t *neuron = (neuron_t *) population->neuron;
 
 #ifdef DEBUG
     io_printf(IO_STD, "Computation at time %u us\n", time);
@@ -38,7 +37,7 @@ void buffer_post_synaptic_potentials(void *dma_copy, uint row_size)
 
 #ifdef DEBUG
             if (spin1_get_chip_id() == 0x0000 && spin1_get_core_id() == 0x0002 && decoded_word.index == 0)
-        io_printf(IO_STD, "Type %d, weight %d, index %d, arrival %d, slot %d, exci slot address: %08x, inhi slot address: %08x, synapses: %08x, synaptic word: %08x\n", decoded_word.synapse_type, decoded_word.weight, decoded_word.index, arrival, arrival % PSP_BUFFER_SIZE, (int)&psp_buffer[decoded_word.index].exci[arrival % PSP_BUFFER_SIZE], (int)&psp_buffer[decoded_word.index].inhi[arrival % PSP_BUFFER_SIZE], (int) &synaptic_row->synapses[i], synaptic_row->synapses[i]);
+        io_printf(IO_STD, "Type %d, weight %d, index %d, arrival %d, synapses: %08x, synaptic word: %08x\n", decoded_word.synapse_type, decoded_word.weight, decoded_word.index, time, (int) &synaptic_row->synapses[i], synaptic_row->synapses[i]);
 #endif
 
         // Process only if the weight is non-zero
@@ -60,7 +59,7 @@ void buffer_post_synaptic_potentials(void *dma_copy, uint row_size)
                     if (delta_t <= neuron[decoded_word.index].delay_window) {
                         uint key = spin1_get_chip_id() << 16 |
                           app_data.virtual_core_id << 11 |
-                          population[0].id |
+                          population->id |
                           decoded_word.index;
 
                         spin1_send_mc_packet(key, NULL, NO_PAYLOAD);
@@ -75,7 +74,7 @@ void buffer_post_synaptic_potentials(void *dma_copy, uint row_size)
                     if (delta_t <= neuron[decoded_word.index].delay_window) {
                         uint key = spin1_get_chip_id() << 16 |
                           app_data.virtual_core_id << 11 |
-                          population[0].id |
+                          population->id |
                           decoded_word.index;
 
                         spin1_send_mc_packet(key, NULL, NO_PAYLOAD);
@@ -134,7 +133,11 @@ void configure_recording_space()
     spike_count_dest = (int *) spin1_malloc(num_populations*sizeof(int));
     spike_count =  (int *) spike_count_dest;
     for(uint i = 0; i < num_populations; i++) spike_count[i] = 0; //TODO improve
+}
 
+void configure_model()
+{
+  io_printf(IO_STD, "Running SynchronyDectector model...\n");
 }
 
 void decode_synaptic_word (unsigned int word, synaptic_word_t *decoded_word)

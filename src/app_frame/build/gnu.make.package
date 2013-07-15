@@ -100,30 +100,6 @@ izhikevich_stdp_tts: $(APP_OBJECTS) $(STDP_TTS_OBJECTS) model_izhikevich_stdp_tt
 	${CP} app_frame_izhikevich_tts.aplx ../../../binaries
 	${MV} app_frame_izhikevich_tts.aplx app_frame_izhikevich_tts.elf ../bin
 
-dendritic_synchrony: $(APP_OBJECTS) $(FLAT_OBJECTS) model_dendritic_synchrony.o app_frame.lnk
-	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_dendritic_synchrony.o
-	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_dendritic_synchrony.elf
-	$(OC) -O binary -j APLX    app_frame_dendritic_synchrony.elf APLX.bin
-	$(OC) -O binary -j RO_DATA app_frame_dendritic_synchrony.elf RO_DATA.bin
-	$(OC) -O binary -j RW_DATA app_frame_dendritic_synchrony.elf RW_DATA.bin
-	$(OD) -dt app_frame_dendritic_synchrony.elf > app_frame_dendritic_synchrony.lst
-	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_dendritic_synchrony.aplx
-	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
-	${CP} app_frame_dendritic_synchrony.aplx ../../../binaries
-	${MV} app_frame_dendritic_synchrony.aplx app_frame_dendritic_synchrony.elf ../bin
-
-delay_us: $(APP_OBJECTS) $(FLAT_OBJECTS) model_delay_us.o app_frame.lnk
-	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_delay_us.o
-	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_delay_us.elf
-	$(OC) -O binary -j APLX    app_frame_delay_us.elf APLX.bin
-	$(OC) -O binary -j RO_DATA app_frame_delay_us.elf RO_DATA.bin
-	$(OC) -O binary -j RW_DATA app_frame_delay_us.elf RW_DATA.bin
-	$(OD) -dt app_frame_delay_us.elf > app_frame_delay_us.lst
-	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_delay_us.aplx
-	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
-	${CP} app_frame_delay_us.aplx ../../../binaries
-	${MV} app_frame_delay_us.aplx app_frame_delay_us.elf ../bin
-
 #lif: $$(APP_OBJECTS) model_lif.o app_frame.lnk
 lif: $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif.o app_frame.lnk
 	$(LD) -T app_frame.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_lif.o
@@ -256,14 +232,6 @@ model_izhikevich_stdp_sp.o: ../src/model_izhikevich.c ../inc/dma.h ../inc/model_
 
 model_izhikevich_stdp_tts.o: ../src/model_izhikevich.c ../inc/dma.h ../inc/model_general.h ../inc/model_izhikevich.h ../inc/recording.h ../inc/stdp_tts.h
 	$(CC) $(FLAGS) -o model_izhikevich_stdp_tts.o ../src/model_izhikevich.c
-
-
-model_dendritic_synchrony.o: ../src/model_dendritic_synchrony.c ../inc/model_general.h ../inc/recording.h
-	$(CC) $(FLAGS) ../src/model_dendritic_synchrony.c
-
-
-model_delay_us.o: ../src/model_delay_us.c ../inc/model_general.h ../inc/recording.h
-	$(CC) $(FLAGS) ../src/model_delay_us.c
 
 
 model_lif.o: ../src/model_lif.c ../inc/model_general.h ../inc/recording.h

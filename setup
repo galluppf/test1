@@ -26,7 +26,7 @@ cd $MY_DIR
 update_links()
 {
 echo -e "checking write permission on $MY_PYNN/../"
-if [ -w "$MY_PYNN/../" ]; 
+if [ -w "$MY_PYNN/../" ];
     then
         echo -e "# updating python links"
         rm -f "$MY_PYNN/../pacman"
@@ -55,67 +55,73 @@ cd $MY_DIR
 make_models()
 {
     cd src/app_frame/build
-    
+
     # make neuron models
-    make -f $MAKEFILE_SPINN_API clean    
-    make -f $MAKEFILE_SPINN_API dendritic_synchrony
-    make -f $MAKEFILE_SPINN_API delay_us
+    make -f $MAKEFILE_SPINN_API clean
     make -f $MAKEFILE_SPINN_API lif
     make -f $MAKEFILE_SPINN_API lif_cond
     make -f $MAKEFILE_SPINN_API izhikevich
-    
+
     # make stdp
-    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API clean
     make -f $MAKEFILE_SPINN_API lif_stdp
     make -f $MAKEFILE_SPINN_API lif_cond_stdp
     make -f $MAKEFILE_SPINN_API izhikevich_stdp
 
     # make stdp_sp
-    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API clean
     make -f $MAKEFILE_SPINN_API lif_stdp_sp
     make -f $MAKEFILE_SPINN_API lif_cond_stdp_sp
     make -f $MAKEFILE_SPINN_API izhikevich_stdp_sp
 
     # make stdp_tts (only izhikevich)
-    make -f $MAKEFILE_SPINN_API clean    
-    make -f $MAKEFILE_SPINN_API izhikevich_stdp_tts    
-    
+    make -f $MAKEFILE_SPINN_API clean
+    make -f $MAKEFILE_SPINN_API izhikevich_stdp_tts
+
     # cleaning up
-    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API clean
     cd $MY_DIR
-    
+
     cd src/app_spike_source/build
-    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API clean
     make -f $MAKEFILE_SPINN_API spike_source
     make -f $MAKEFILE_SPINN_API spike_source_array
-    make -f $MAKEFILE_SPINN_API spike_source_poisson    
+    make -f $MAKEFILE_SPINN_API spike_source_poisson
     cd ..
-    
+
     cd $MY_DIR
     cd src/app_dump/build
-    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API clean
     make -f $MAKEFILE_SPINN_API
 #    ln -sfv $(pwd)/spike_receiver.py ../../../tools
     cd $MY_DIR
-    
+
     cd $MY_DIR
     cd src/app_proxy/build
-    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API clean
     make -f $MAKEFILE_SPINN_API
     cd $MY_DIR
 
-    # NEF part    
+    # NEF part
     cd $MY_DIR
     cd src/app_frame_nef/build
-    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API clean
     make -f $MAKEFILE_SPINN_API lif_32
     make -f $MAKEFILE_SPINN_API nef_out_1d
     make -f $MAKEFILE_SPINN_API lif_nef_1d
 
-    make -f $MAKEFILE_SPINN_API clean    
+    make -f $MAKEFILE_SPINN_API clean
     make -f $MAKEFILE_SPINN_API nef_out_2d
     make -f $MAKEFILE_SPINN_API lif_nef_2d
-    
+
+
+    # make asynchronous neuron models
+    cd $MY_DIR
+    cd src/app_frame_async/build
+    make -f $MAKEFILE_SPINN_API clean
+    make -f $MAKEFILE_SPINN_API dendritic_delay
+    make -f $MAKEFILE_SPINN_API synchrony_detector
+
     cd $MY_DIR
 }
 
@@ -126,7 +132,7 @@ setup_nengo()
 #    ln -svf $(pwd)/binaries/nengo_values.py $(pwd)/nengo_values.py
     ln -svf $(pwd)/nengo_spinnaker_interface $MY_NENGO
     ln -svf $(pwd)/nengo_spinnaker_interface/nengo-cl-spinnaker $MY_NENGO
-    
+
 }
 
 make_package()
@@ -169,8 +175,8 @@ do
                 a) echo -e "make all models"; make_models;;
                 d) echo -e "make model_library DB"; make_model_library;;
                 l) echo -e "update links"; update_links;;
-                m) echo -e "make full package"; make_package;;                
-                n) echo -e "setup nengo interface"; setup_nengo;;                
+                m) echo -e "make full package"; make_package;;
+                n) echo -e "setup nengo interface"; setup_nengo;;
 
 
         esac

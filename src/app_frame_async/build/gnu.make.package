@@ -1,0 +1,66 @@
+.SECONDEXPANSION:
+
+LIB_DIR = ../../spin1_api/src
+INC_DIR = ../../spin1_api/src
+
+APP_OBJECTS = config.o comms.o recording.o
+
+FLAT_OBJECTS = dma.o main.o
+
+CC := arm-none-linux-gnueabi-gcc -c -O1 -nostdlib -mthumb-interwork -march=armv5te -std=gnu99 -I ../inc -I $(INC_DIR) $(CFLAGS)
+LD := arm-none-linux-gnueabi-ld
+OC := arm-none-linux-gnueabi-objcopy
+OD := arm-none-linux-gnueabi-objdump
+RM := /bin/rm -rf
+CAT := /bin/cat
+CP := cp
+MV := mv
+
+synchrony_detector: $(APP_OBJECTS) $(FLAT_OBJECTS) model_synchrony_detector.o app_frame_async.lnk
+	$(LD) -T app_frame_async.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_synchrony_detector.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_async_synchrony_detector.elf
+	$(OC) -O binary -j APLX    app_frame_async_synchrony_detector.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_async_synchrony_detector.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_async_synchrony_detector.elf RW_DATA.bin
+	$(OD) -dt app_frame_async_synchrony_detector.elf > app_frame_async_synchrony_detector.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_async_synchrony_detector.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_async_synchrony_detector.aplx ../../../binaries
+	${MV} app_frame_async_synchrony_detector.aplx app_frame_async_synchrony_detector.elf ../bin
+
+dendritic_delay: $(APP_OBJECTS) $(FLAT_OBJECTS) model_dendritic_delay.o app_frame_async.lnk
+	$(LD) -T app_frame_async.lnk $(LIB_DIR)/spin1_api_gnulib.o $(APP_OBJECTS) $(FLAT_OBJECTS) model_dendritic_delay.o
+	$(OC) --set-section-flags APLX=alloc,code,readonly a.out app_frame_async_dendritic_delay.elf
+	$(OC) -O binary -j APLX    app_frame_async_dendritic_delay.elf APLX.bin
+	$(OC) -O binary -j RO_DATA app_frame_async_dendritic_delay.elf RO_DATA.bin
+	$(OC) -O binary -j RW_DATA app_frame_async_dendritic_delay.elf RW_DATA.bin
+	$(OD) -dt app_frame_async_dendritic_delay.elf > app_frame_async_dendritic_delay.lst
+	${CAT} APLX.bin RO_DATA.bin RW_DATA.bin > app_frame_async_dendritic_delay.aplx
+	${RM} APLX.bin RO_DATA.bin RW_DATA.bin a.out
+	${CP} app_frame_async_dendritic_delay.aplx ../../../binaries
+	${MV} app_frame_async_dendritic_delay.aplx app_frame_async_dendritic_delay.elf ../bin
+
+comms.o: ../src/comms.c ../inc/comms.h ../inc/dma.h
+	$(CC) $(FLAGS) ../src/comms.c
+
+config.o: ../src/config.c ../inc/config.h ../inc/dma.h ../inc/model_general.h
+	$(CC) $(FLAGS) ../src/config.c
+
+dma.o: ../src/dma.c ../inc/comms.h ../inc/dma.h ../inc/model_general.h
+	$(CC) $(FLAGS) ../src/dma.c
+
+main.o: ../src/main.c  ../inc/comms.h ../inc/config.h  ../inc/dma.h ../inc/model_general.h
+	$(CC) $(FLAGS) ../src/main.c
+
+model_synchrony_detector.o: ../src/model_synchrony_detector.c ../inc/model_general.h ../inc/recording.h
+	$(CC) $(FLAGS) ../src/model_synchrony_detector.c
+
+model_dendritic_delay.o: ../src/model_dendritic_delay.c ../inc/model_general.h ../inc/recording.h
+	$(CC) $(FLAGS) ../src/model_dendritic_delay.c
+
+recording.o: ../src/recording.c ../inc/recording.h
+	$(CC) $(FLAGS) ../src/recording.c
+
+clean:
+	$(RM) *.o  *.txt ../bin/* *~
+	$(RM) ../doc/*.html ../doc/*.css ../doc/bin ../doc/build ../doc/inc ../doc/src

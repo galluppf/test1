@@ -6,13 +6,12 @@
 #include "config.h"
 #include "dma.h"
 #include "model_general.h"
-#include "model_delay_us.h"
+#include "model_dendritic_delay.h"
 #include "recording.h"
 
 // Neuron data structures
 uint num_populations;
 population_t *population;
-psp_buffer_t *psp_buffer;
 spike_ring_t *spike_ring;
 uint delay_us;
 
@@ -39,30 +38,25 @@ void send_spike_callback(uint time_ms, uint time_us) {
   }
   // Queue the next event in the ring if it exists
   if (!spike_ring->ring_empty) {
+#ifdef DEBUG
+    io_printf(IO_STD, "Scheduling next event in %u us.\n", spike_ring->ring[spike_ring->ring_start].ts - time);
+#endif
     schedule_trigger_timer2(send_spike_callback,
                             spike_ring->ring[spike_ring->ring_start].ts - time);
   }
 }
 
-void buffer_post_synaptic_potentials(void *dma_copy, uint row_size)
+void synaptic_event(void *dma_copy, uint row_size)
 {
     uint time = spin1_get_simulation_time()*1000 + spin1_get_us_since_last_tick();
 
 #ifdef DEBUG
-    io_printf(IO_STD, "Inside buffer_post_synaptic_potentials\n");
+    io_printf(IO_STD, "Inside synaptic_event\n");
+    io_printf(IO_STD, "Received event at time %u ms\n", time);
 #endif
 
     synaptic_row_t *synaptic_row = (synaptic_row_t *) dma_copy;
-    neuron_t *neuron = (neuron_t *) population[0].neuron;
-
-#ifdef DEBUG
-    io_printf(IO_STD, "Received event at time %u ms\n", time);
-    io_printf(IO_STD, "Ring state :\n");
-    io_printf(IO_STD, "\tstart : %u\n", spike_ring->ring_start);
-    io_printf(IO_STD, "\tend : %u\n", spike_ring->ring_end);
-    io_printf(IO_STD, "\tempty : %d\n", spike_ring->ring_empty);
-    io_printf(IO_STD, "\tring addr : 0x%x\n", spike_ring->ring);
-#endif
+    neuron_t *neuron = (neuron_t *) population->neuron;
 
     for(uint i = 0; i < row_size; i++)
     {
@@ -90,17 +84,27 @@ void buffer_post_synaptic_potentials(void *dma_copy, uint row_size)
           spike_ring->ring[spike_ring->ring_end].key =
             spin1_get_chip_id() << 16 |
             app_data.virtual_core_id << 11 |
-            population[0].id | decoded_word.index;
+            population->id | decoded_word.index;
           spike_ring->ring_end = (spike_ring->ring_end+1) % SPIKE_QUEUE_SIZE;
           if (spike_ring->ring_empty) {
 #ifdef DEBUG
-          io_printf(IO_STD, "Scheduling an event.\n");
+            io_printf(IO_STD, "Scheduling an event in %u us.\n", delay_us);
 #endif
             schedule_trigger_timer2(send_spike_callback, delay_us);
           }
           spike_ring->ring_empty = 0;
         }
     }
+
+#ifdef DEBUG
+    io_printf(IO_STD, "Received event at time %u ms\n", time);
+    io_printf(IO_STD, "Ring state :\n");
+    io_printf(IO_STD, "\tstart : %u\n", spike_ring->ring_start);
+    io_printf(IO_STD, "\tend : %u\n", spike_ring->ring_end);
+    io_printf(IO_STD, "\tempty : %d\n", spike_ring->ring_empty);
+    io_printf(IO_STD, "\tring addr : 0x%x\n", spike_ring->ring);
+#endif
+
 }
 
 
@@ -147,13 +151,18 @@ void configure_recording_space()
     spike_count_dest = (int *) spin1_malloc(num_populations);
     spike_count =  (int *) spike_count_dest;
     for(uint i = 0; i < num_populations; i++) spike_count[i] = 0; //TODO improve
+}
 
+void configure_model()
+{
     // Initialize spike queue
-    delay_us = ((neuron_t *)population[0].neuron)[0].delay;
+    delay_us = ((neuron_t *)population->neuron)[0].delay;
     spike_ring = (spike_ring_t*)spin1_malloc((3+SPIKE_QUEUE_SIZE)*sizeof(uint));
     spike_ring->ring_start = 0;
     spike_ring->ring_end = 0;
     spike_ring->ring_empty = 1;
+
+    io_printf(IO_STD, "Running DendriticDelay model with delay %u...\n", delay_us);
 }
 
 void decode_synaptic_word (unsigned int word, synaptic_word_t *decoded_word)

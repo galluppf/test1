@@ -1,10 +1,10 @@
 from pyNN.standardmodels import cells, build_translations, ModelNotAvailable
 from pyNN import errors
 
-class DendriticSynchrony(cells.IF_curr_exp):
+class SynchronyDetector(cells.IF_curr_exp):
     """Neural model detecting synchrony of events arriving to different
     dendrites of a neuron with microsecond precision."""
-    __name__ = "DendriticSynchrony"
+    __name__ = "SynchronyDetector"
     cell_params = ['last1', 'last2', 'refractory_period', 'delay_window', 'last_spike']
     synapses  =   {'input1': 0, 'input2': 1}
     default_parameters = {'last1' : 0, 'last2': 0, 'refractory_period':0, 'delay_window' : 200, 'last_spike' : 0}
@@ -12,9 +12,9 @@ class DendriticSynchrony(cells.IF_curr_exp):
         self.__name__ = __name__
         pass
 
-class DelayUs(cells.IF_curr_exp):
+class DendriticDelay(cells.IF_curr_exp):
     """Neural model of a delay line with microsecond precision."""
-    __name__ = "DelayUs"
+    __name__ = "DendriticDelay"
     cell_params = ['delay']
     synapses  =   {'input': 0}
     default_parameters = {}
