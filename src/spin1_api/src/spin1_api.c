@@ -1788,12 +1788,21 @@ void configure_timer1(uint time)
 */
 void schedule_trigger_timer2(callback_t cback, uint delay_us)
 {
-  tc[T2_CONTROL] = 0;
-  tc[T2_INT_CLR] = 1;
-  scheduled_t2_cback = cback;
-  tc[T2_LOAD] = sv->cpu_clk * delay_us;
-  tc[T2_BG_LOAD] = 0;
-  tc[T2_CONTROL] = 0xe3;
+  // directly schedule the callback if delay_us is zero
+  if (delay_us == 0) {
+    spin1_schedule_callback(cback,
+                            ticks,
+                            (tc[T1_LOAD] - tc[T1_COUNT]) / sv->cpu_clk,
+                            1);
+  } else {
+    // delay_us > 0, start the timer
+    tc[T2_CONTROL] = 0;
+    tc[T2_INT_CLR] = 1;
+    scheduled_t2_cback = cback;
+    tc[T2_LOAD] = sv->cpu_clk * delay_us;
+    tc[T2_BG_LOAD] = 0;
+    tc[T2_CONTROL] = 0xe3;
+  }
 }
 /*
 *******/
