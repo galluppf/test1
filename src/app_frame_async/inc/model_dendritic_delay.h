@@ -8,8 +8,7 @@
 #define P1                      (1 << LOG_P1)
 #define P2                      (1 << LOG_P2)
 
-#define SPIKE_QUEUE_SIZE        100
-
+#define SPIKE_QUEUE_SIZE        6144
 typedef struct
 {
     // Membrane potential constants and variables

@@ -97,7 +97,12 @@ void set_population_flag(int operation, int flag_position, int population_id)
 }
 
 
-void timer_callback(uint ticks, uint null) { }
+void timer_callback(uint ticks, uint null) {
+  if(ticks >= app_data.run_time) {
+    io_printf(IO_STD, "Simulation complete.\n");
+    spin1_stop();
+  }
+}
 
 
 // Functions specific for every neural model, implementing prototypes in model_general.h
