@@ -39,9 +39,9 @@
 #define RDY1_KEY              (uint) ((0x1ffff << 11) | 2)
 #define RDY2_KEY              (uint) ((0x1ffff << 11) | 3)
 #define BARRIER_MASK          (uint) (0xffffffff)
-#define BARRIER_GO_WAIT       50000
+#define BARRIER_GO_WAIT       500000
 #define BARRIER_RDY2_WAIT     2500
-#define BARRIER_RDYGO_WAIT    25000
+#define BARRIER_RDYGO_WAIT    250000
 #define BARRIER_LOCK_WAIT     5000
 #define BARRIER_RESEND_WAIT   100
 
