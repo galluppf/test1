@@ -14,6 +14,8 @@ uint num_populations;
 population_t *population;
 spike_ring_t *spike_ring;
 uint delay_us;
+uint missed_events;
+uint events_received, events_sent;
 
 void send_spike_callback(uint time_ms, uint time_us) {
   uint time = time_ms * 1000 + time_us;
@@ -31,6 +33,7 @@ void send_spike_callback(uint time_ms, uint time_us) {
   while (spike_ring->ring_empty != 1 &&
          spike_ring->ring[spike_ring->ring_start].ts <= time) {
     spin1_send_mc_packet(spike_ring->ring[spike_ring->ring_start].key, NULL, NO_PAYLOAD);
+    events_sent++;
     spike_ring->ring_start = (spike_ring->ring_start + 1) % SPIKE_QUEUE_SIZE;
     if (spike_ring->ring_start == spike_ring->ring_end) {
       spike_ring->ring_empty = 1;
@@ -49,6 +52,7 @@ void send_spike_callback(uint time_ms, uint time_us) {
 void synaptic_event(void *dma_copy, uint row_size)
 {
     uint time = spin1_get_simulation_time()*1000 + spin1_get_us_since_last_tick();
+    char evt_connected = 0;
 
 #ifdef DEBUG
     io_printf(IO_STD, "Inside synaptic_event\n");
@@ -75,10 +79,11 @@ void synaptic_event(void *dma_copy, uint row_size)
 #endif
           continue;
         }
+        evt_connected = 1;
 
         // Drop the event if the queue is full
         if (!spike_ring->ring_empty && spike_ring->ring_start == spike_ring->ring_end) {
-          io_printf(IO_STD, "Queue full, dropped event at time %u us\n", time);
+          missed_events++;
         } else {
           spike_ring->ring[spike_ring->ring_end].ts = time + delay_us;
           spike_ring->ring[spike_ring->ring_end].key =
@@ -104,7 +109,9 @@ void synaptic_event(void *dma_copy, uint row_size)
     io_printf(IO_STD, "\tempty : %d\n", spike_ring->ring_empty);
     io_printf(IO_STD, "\tring addr : 0x%x\n", spike_ring->ring);
 #endif
-
+    if (evt_connected) {
+      events_received++;
+    }
 }
 
 
@@ -115,7 +122,14 @@ void set_population_flag(int operation, int flag_position, int population_id)
 }
 
 
-void timer_callback(uint ticks, uint null) { }
+void timer_callback(uint ticks, uint null) {
+  if(ticks >= app_data.run_time) {
+    io_printf(IO_STD, "Simulation complete.\n");
+    io_printf(IO_STD, "Received %d events, sent %d events.\n", events_received, events_sent);
+    io_printf(IO_STD, "Missed %d events because of queue full\n", missed_events);
+    spin1_stop();
+  }
+}
 
 // Functions specific for every neural model, implementing prototypes in model_general.h
 
@@ -158,9 +172,17 @@ void configure_model()
     // Initialize spike queue
     delay_us = ((neuron_t *)population->neuron)[0].delay;
     spike_ring = (spike_ring_t*)spin1_malloc((3+SPIKE_QUEUE_SIZE)*sizeof(uint));
+    if (spike_ring == NULL) {
+      io_printf(IO_STD, "DendriticDelay: Impossible to allocate memory for the event ring\n");
+      while(1) ;
+    }
     spike_ring->ring_start = 0;
     spike_ring->ring_end = 0;
     spike_ring->ring_empty = 1;
+
+    missed_events = 0;
+    events_received = 0;
+    events_sent = 0;
 
     io_printf(IO_STD, "Running DendriticDelay model with delay %u...\n", delay_us);
 }
