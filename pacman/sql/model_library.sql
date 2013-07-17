@@ -126,14 +126,15 @@ INSERT INTO "cell_types" VALUES(6,1000,'Dummy','app_frame_dummy.aplx');
 INSERT INTO "cell_types" VALUES(7,200,'IF_NEF_2D','app_frame_lif_nef_2d.aplx');
 INSERT INTO "cell_types" VALUES(8,200,'NEF_OUT_2D','app_frame_nef_out_2d.aplx');
 INSERT INTO "cell_types" VALUES(9,2048,'ProxyNeuron','app_proxy.aplx');
+INSERT INTO "cell_types" VALUES(11,100,'SynchronyDetector','app_frame_async_synchrony_detector.aplx');
+INSERT INTO "cell_types" VALUES(12,100,'DendriticDelay','app_frame_async_dendritic_delay.aplx');
+INSERT INTO "cell_types" VALUES(13,100,'MotorControl','app_motor_control.aplx');
 INSERT INTO "cell_types" VALUES(97,300,'IF_NEF_1D','app_frame_lif_nef_1d.aplx');
 INSERT INTO "cell_types" VALUES(99,2048,'SpikeSourceArray','app_frame_spike_source_array.aplx');
 INSERT INTO "cell_types" VALUES(100,2048,'SpikeSourcePoisson','app_frame_spike_source_poisson.aplx');
 INSERT INTO "cell_types" VALUES(101,1,'SpikeSink','app_frame_spike_sink.aplx');
 INSERT INTO "cell_types" VALUES(102,1,'Recorder','app_monitoring.aplx');
 INSERT INTO "cell_types" VALUES(103,2048,'SpikeSource','app_frame_spike_source.aplx');
-INSERT INTO "cell_types" VALUES(11,100,'SynchronyDetector','app_frame_async_synchrony_detector.aplx');
-INSERT INTO "cell_types" VALUES(12,100,'DendriticDelay','app_frame_async_dendritic_delay.aplx');
 CREATE TABLE synapse_types (
     id INTEGER PRIMARY KEY,
     "synapse_name" TEXT,
@@ -165,6 +166,7 @@ INSERT INTO "synapse_types" VALUES(25,'inhibitory',1,5,'[[0, 0, 0, 0], [0, 1, 0x
 INSERT INTO "synapse_types" VALUES(29,'input1',0,11,'[[-1, 1, 0xF, 28],[0, 1, 0x7FF, 16],[0, 256, 0x1FFF, 0],[0, 1, 0x1, 27],[0, 1, 0x7, 13]]');
 INSERT INTO "synapse_types" VALUES(30,'input2',1,11,'[[-1, 1, 0xF, 28],[0, 1, 0x7FF, 16],[0, -256, 0x1FFF, 0],[0, 1, 0x1, 27],[0, 1, 0x7, 13]]');
 INSERT INTO "synapse_types" VALUES(31,'input',0,12,'[[-1, 1, 0xF, 28],[0, 1, 0x7FF, 16],[0, 256, 0x1FFF, 0],[0, 1, 0x1, 27],[0, 1, 0x7, 13]]');
+INSERT INTO "synapse_types" VALUES(32,'motor_input',0,13,'[[0, 0, 0, 0],[0, 1, 0xFFFFFFFF, 0],[0, 0, 0, 0],[0, 0, 0, 0],[0, 0, 0, 0]]');
 CREATE TABLE plasticity_suffix (
     "id" INTEGER PRIMARY KEY,
     "model_name" TEXT,

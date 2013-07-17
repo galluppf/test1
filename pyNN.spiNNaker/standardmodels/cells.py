@@ -1,6 +1,17 @@
 from pyNN.standardmodels import cells, build_translations, ModelNotAvailable
 from pyNN import errors
 
+class MotorControl(cells.IF_curr_exp):
+    """Neural model for encoding controlling the motors."""
+    __name__ = "SynchronyDetector"
+    cell_params = ['param1']
+    synapses  =   {'input': 0}
+    default_parameters = {'param1' : 0}
+    def __init__(self):
+        self.__name__ = __name__
+        pass
+
+
 class SynchronyDetector(cells.IF_curr_exp):
     """Neural model detecting synchrony of events arriving to different
     dendrites of a neuron with microsecond precision."""
