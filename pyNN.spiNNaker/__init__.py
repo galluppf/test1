@@ -253,31 +253,21 @@ class Population():
         
         start_id = entries[0]['absolute_start_id']
         end_id = start_id + entries[0]['size']
-        try:
-            with open(TMP_RASTER_FILE, 'r') as fsource:
-                read_data = fsource.readlines()
-
-            for r in read_data:
-                if r.startswith('#'):   pass    # comment
-                else: 
-                    values = r.split("\t")
-                    neural_id = eval(values[VALUE])
-                    time = eval(values[TIME])
-                    if neural_id in range(start_id, end_id): 
-                        out.append((time, neural_id-start_id))
-    #                    f.write("%s\t%d\n"    % (values[TIME], eval(values[VALUE])-start_id))
-            # Convert list to numpy array
-            spikeArray = numpy.asarray(out)
-            # Switch the columns. 0 is the neuronID and 1 
-            # is the time of the spike
-            spikeArray[:,[0,1]] = spikeArray[:,[1,0]]
-            # Sort by neuron ID and not by time 
-            # First get the indeces to do that  
-            spikeIndex = numpy.lexsort((spikeArray[:,1],spikeArray[:,0]))
-            out = spikeArray[spikeIndex]
-        except:
-            print "[ pyNN.spiNNaker ] : no spikes in population", self.label
-            out = []
+        spikeArray = numpy.loadtxt(TMP_RASTER_FILE)
+        idx = spikeArray[:,1] >= start_id
+        spikeArray = spikeArray[idx]
+        idx = spikeArray[:,1] < end_id
+        spikeArray = spikeArray[idx]
+        spikeArray[:,1] = spikeArray[:,1]-start_id
+        
+        spikeArray[:,[0,1]] = spikeArray[:,[1,0]]
+        # Sort by neuron ID and not by time 
+        # First get the indeces to do that  
+        spikeIndex = numpy.lexsort((spikeArray[:,1],spikeArray[:,0]))
+        out = spikeArray[spikeIndex]
+#        except:
+#            print "[ pyNN.spiNNaker ] : no spikes in population", self.label, sys.exc_info()[0]
+#            out = []
         return out
 
     
