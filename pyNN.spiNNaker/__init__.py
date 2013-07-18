@@ -256,21 +256,21 @@ class Population():
 #        spikeArray = numpy.loadtxt(TMP_RASTER_FILE)
 
         spikeArray = simulator.complete_spike_list
-                
-        idx = spikeArray[:,1] >= start_id
-        spikeArray = spikeArray[idx]
-        idx = spikeArray[:,1] < end_id
-        spikeArray = spikeArray[idx]
-        spikeArray[:,1] = spikeArray[:,1]-start_id
-        
-        spikeArray[:,[0,1]] = spikeArray[:,[1,0]]
-        # Sort by neuron ID and not by time 
-        # First get the indeces to do that  
-        spikeIndex = numpy.lexsort((spikeArray[:,1],spikeArray[:,0]))
-        out = spikeArray[spikeIndex]
-#        except:
-#            print "[ pyNN.spiNNaker ] : no spikes in population", self.label, sys.exc_info()[0]
-#            out = []
+        try:        
+            idx = spikeArray[:,1] >= start_id
+            spikeArray = spikeArray[idx]
+            idx = spikeArray[:,1] < end_id
+            spikeArray = spikeArray[idx]
+            spikeArray[:,1] = spikeArray[:,1]-start_id
+            
+            spikeArray[:,[0,1]] = spikeArray[:,[1,0]]
+            # Sort by neuron ID and not by time 
+            # First get the indeces to do that  
+            spikeIndex = numpy.lexsort((spikeArray[:,1],spikeArray[:,0]))
+            out = spikeArray[spikeIndex]
+        except:
+            print "[ pyNN.spiNNaker ] : no spikes in population", self.label, sys.exc_info()[0]
+            out = []
         return out
 
     
