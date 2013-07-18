@@ -31,12 +31,15 @@ from pacman.dao import db
 from pyNN import common, errors, core
 import os
 import pacman
+import numpy
 
 import time
 t0 = time.time()
 
 #TMP_RASTER_FILE = '/tmp/temp.spikes'
 TMP_RASTER_FILE = '%s/temp_spikes.dat' % pacman.BINARIES_DIRECTORY
+complete_spike_list = 0
+
 
 DEBUG = pacman.pacman_configuration.getboolean('pyNN.spiNNaker', 'debug')
 global original_pynn_script_directory
@@ -121,6 +124,9 @@ def run(simtime):
         pacman.wait_for_simulation()    # will wait for the simulation to finish it run_simulation is set to true in pacman.cfg
         print "[ pyNN ] : ...done!\n"
         os.system('sleep 2')
+        global complete_spike_list
+        complete_spike_list = numpy.loadtxt(TMP_RASTER_FILE)
+
         os.chdir(pacman.original_pynn_script_directory)
 
     os.chdir(pacman.original_pynn_script_directory)

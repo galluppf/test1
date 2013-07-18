@@ -253,7 +253,10 @@ class Population():
         
         start_id = entries[0]['absolute_start_id']
         end_id = start_id + entries[0]['size']
-        spikeArray = numpy.loadtxt(TMP_RASTER_FILE)
+#        spikeArray = numpy.loadtxt(TMP_RASTER_FILE)
+
+        spikeArray = simulator.complete_spike_list
+                
         idx = spikeArray[:,1] >= start_id
         spikeArray = spikeArray[idx]
         idx = spikeArray[:,1] < end_id
